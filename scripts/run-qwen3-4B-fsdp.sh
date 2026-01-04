@@ -18,6 +18,7 @@ set -ex
 # will prevent ray from buffering stdout/stderr
 export PYTHONBUFFERED=16
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+
 NVLINK_COUNT=$(nvidia-smi | grep -o "NVLink" | wc -l)
 if [ "$NVLINK_COUNT" -gt 0 ]; then
     HAS_NVLINK=1
@@ -77,8 +78,8 @@ OPTIMIZER_ARGS=(
 
 WANDB_ARGS=(
    --use-wandb
-   --wandb-project slime-dev-mcore-fsdp
-   --wandb-group qwen3-4B-fsdp-1130-ref
+   --wandb-project slime-dev
+   --wandb-group qwen3-4B-fsdp
    --wandb-key ${WANDB_API_KEY}
 )
 

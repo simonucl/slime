@@ -52,7 +52,7 @@ EVAL_ARGS=(
    --eval-interval 5
    --eval-prompt-data retail-dev /root/tau-bench/retail_dev_tasks.jsonl
    --n-samples-per-eval-prompt 1
-   --eval-max-response-len 1024
+   --eval-max-response-len 4096
    --eval-top-k 1
 )
 
@@ -90,10 +90,10 @@ OPTIMIZER_ARGS=(
 )
 
 WANDB_ARGS=(
-   # --use-wandb
-   # --wandb-project slime-tau-bench
-   # --wandb-group qwen3-4B
-   # --wandb-key ${WANDB_KEY}
+   --use-wandb
+   --wandb-project slime-tau-bench
+   --wandb-group qwen3-4B
+   --wandb-key ${WANDB_API_KEY}
 )
 
 SGLANG_ARGS=(

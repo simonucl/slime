@@ -23,16 +23,20 @@ logger = logging.getLogger(__name__)
 TAU_CONFIGS = {
     "env": "retail",  # Select between ["retail", "airline"]
     "agent": "tool-calling",  # Select between ["tool-calling", "act", "react", "few-shot"]
-    "user_model": "gemini-2.5-flash-lite",  # Cheap Model for user simulator
+    "user_model": "google/gemini-2.5-flash-lite-preview-09-2025",  # Cheap Model for user simulator
+    "user_model_provider": "openrouter",
     "task_split": "train",  # Select between ["train", "test", "dev"] for retail
     "user_strategy": "llm",  # Select between ["llm", "react", "verify", "reflection"]
     "model_provider": "auto_router",  # Unused, required
     "model": "qwen3-4b",  # Unused, required
-    "user_model_provider": "gemini",
 }
 # Replace with your actual API key for user sim
-GEMINI_API_KEY = "NONE"
-os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
+# GEMINI_API_KEY = "NONE"
+# os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+if OPENROUTER_API_KEY is None:
+    raise ValueError("OPENROUTER_API_KEY is not set")
+os.environ["OPENROUTER_API_KEY"] = OPENROUTER_API_KEY
 tau_config = RunConfig(**TAU_CONFIGS)
 
 
