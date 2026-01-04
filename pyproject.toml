@@ -55,6 +55,7 @@ norecursedirs = [
     "CVS",
     "dist",
     "venv",
+    "nvitop",
     "{arch}",
 ]
 # markers to select tests, use `pytest --markers` to see all available markers, `pytest -m "<marker>"` to select tests
