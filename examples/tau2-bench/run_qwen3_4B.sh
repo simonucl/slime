@@ -27,29 +27,33 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 source "${SCRIPT_DIR}/../../scripts/models/qwen3-4B-Instruct-2507.sh"
 
 # =============================================================================
-# τ-bench Configuration (via environment variables)
+# τ²-bench Configuration (via environment variables)
 # =============================================================================
 # These can be overridden by setting environment variables before running this script
 
 # Domain and task configuration
-export TAU_ENV=${TAU_ENV:-"retail"}                    # retail, airline
-export TAU_TASK_SPLIT=${TAU_TASK_SPLIT:-"train"}       # train, test, dev
-export TAU_AGENT=${TAU_AGENT:-"tool-calling"}          # tool-calling, act, react, few-shot
-export TAU_USER_STRATEGY=${TAU_USER_STRATEGY:-"llm"}   # llm, react, verify, reflection
+export TAU2_DOMAIN=${TAU2_DOMAIN:-"retail"}           # retail, airline, telecom, mock
+export TAU2_TASK_SPLIT=${TAU2_TASK_SPLIT:-"train"}    # train, test
+export TAU2_AGENT_TYPE=${TAU2_AGENT_TYPE:-"llm"}      # llm, solo, gt
 
 # User simulator configuration
-export TAU_USER_MODEL=${TAU_USER_MODEL:-"google/gemini-2.5-flash-lite-preview-09-2025"}
-export TAU_USER_MODEL_PROVIDER=${TAU_USER_MODEL_PROVIDER:-"openrouter"}
-export TAU_USER_API_KEY_VAR=${TAU_USER_API_KEY_VAR:-"OPENROUTER_API_KEY"}
+export TAU2_USER_MODEL=${TAU2_USER_MODEL:-"gpt-4o-mini"}
+export TAU2_USER_BASE_URL=${TAU2_USER_BASE_URL:-"https://api.openai.com/v1"}
+export TAU2_USER_API_KEY_VAR=${TAU2_USER_API_KEY_VAR:-"OPENAI_API_KEY"}
+
+# Episode configuration
+export TAU2_MAX_STEPS=${TAU2_MAX_STEPS:-200}    # Max environment steps per episode
+export TAU2_MAX_ERRORS=${TAU2_MAX_ERRORS:-10}   # Max errors before abort
+export TAU2_MAX_TURNS=${TAU2_MAX_TURNS:-30}     # Max agent turns per episode
 
 # Checkpoint naming
 CHECKPOINT_SUFFIX=${CHECKPOINT_SUFFIX:-"slime"}
 
-echo "τ-bench Configuration:"
-echo "  Environment: $TAU_ENV"
-echo "  Task Split: $TAU_TASK_SPLIT"
-echo "  User Model: $TAU_USER_MODEL"
-echo "  User Provider: $TAU_USER_MODEL_PROVIDER"
+echo "τ²-bench Configuration:"
+echo "  Domain: $TAU2_DOMAIN"
+echo "  Task Split: $TAU2_TASK_SPLIT"
+echo "  User Model: $TAU2_USER_MODEL"
+echo "  Max Turns: $TAU2_MAX_TURNS"
 echo "  Checkpoint Suffix: $CHECKPOINT_SUFFIX"
 echo ""
 
@@ -62,7 +66,8 @@ CKPT_ARGS=(
 )
 
 ROLLOUT_ARGS=(
-   --prompt-data /root/tau-bench/retail_train_tasks.jsonl
+   # τ²-bench uses task indices as prompts, created by prepare_tau2_data.py
+   --prompt-data /root/tau2_bench_data/retail_train_tasks.jsonl
    --input-key index
    --rollout-shuffle
    --num-rollout 500
@@ -77,7 +82,8 @@ ROLLOUT_ARGS=(
 
 EVAL_ARGS=(
    --eval-interval 5
-   --eval-prompt-data retail-dev /root/tau-bench/retail_dev_tasks.jsonl
+   # τ²-bench eval data
+   --eval-prompt-data retail-dev /root/tau2_bench_data/retail_dev_tasks.jsonl
    --n-samples-per-eval-prompt 1
    --eval-max-response-len 16384
    --eval-top-k 1
@@ -118,8 +124,8 @@ OPTIMIZER_ARGS=(
 
 WANDB_ARGS=(
    --use-wandb
-   --wandb-project slime-tau-bench
-   --wandb-group qwen3-4B
+   --wandb-project slime-tau2-bench
+   --wandb-group qwen3-4B-retail
    --wandb-key ${WANDB_API_KEY}
    --wandb-run-name qwen3-4B-${CHECKPOINT_SUFFIX}
 )
@@ -127,7 +133,7 @@ WANDB_ARGS=(
 SGLANG_ARGS=(
    --rollout-num-gpus-per-engine 1
    --sglang-mem-fraction-static 0.7
-   # If gemini API reports concurrency limit error, set this parameter to reduce the concurrency
+   # If API reports concurrency limit error, set this parameter to reduce the concurrency
    # --sglang-server-concurrency 32
 )
 
@@ -143,14 +149,16 @@ MISC_ARGS=(
 )
 
 CUSTOM_ARGS=(
-   --custom-generate-function-path generate_with_tau.generate
+   # Use τ²-bench generate function
+   --custom-generate-function-path generate_with_tau2.generate
 )
+
 # launch the master node of ray in container
 export MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
 
 # If you want more or less GPUs, change this parameter
 NUM_GPUS=8
-ray start --head --node-ip-address ${MASTER_ADDR} --num-gpus ${NUM_GPUS} --disable-usage-stats --dashboard-host=0.0.0.0 --dashboard-port=8265 --temp-dir /root/shared/ray_temp 
+ray start --head --node-ip-address ${MASTER_ADDR} --num-gpus ${NUM_GPUS} --disable-usage-stats --dashboard-host=0.0.0.0 --dashboard-port=8265 --temp-dir /root/shared/ray_temp
 
 RUNTIME_ENV_JSON="{
   \"env_vars\": {

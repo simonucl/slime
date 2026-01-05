@@ -20,23 +20,28 @@ from slime.utils.types import Sample
 logger = logging.getLogger(__name__)
 
 # Tau-bench configuration
+# Can be overridden by environment variables
 TAU_CONFIGS = {
-    "env": "retail",  # Select between ["retail", "airline"]
-    "agent": "tool-calling",  # Select between ["tool-calling", "act", "react", "few-shot"]
-    "user_model": "google/gemini-2.5-flash-lite-preview-09-2025",  # Cheap Model for user simulator
-    "user_model_provider": "openrouter",
-    "task_split": "train",  # Select between ["train", "test", "dev"] for retail
-    "user_strategy": "llm",  # Select between ["llm", "react", "verify", "reflection"]
+    "env": os.getenv("TAU_ENV", "retail"),  # Select between ["retail", "airline"]
+    "agent": os.getenv("TAU_AGENT", "tool-calling"),  # Select between ["tool-calling", "act", "react", "few-shot"]
+    "user_model": os.getenv("TAU_USER_MODEL", "google/gemini-2.5-flash-lite-preview-09-2025"),  # Model for user simulator
+    "user_model_provider": os.getenv("TAU_USER_MODEL_PROVIDER", "openrouter"),
+    "task_split": os.getenv("TAU_TASK_SPLIT", "train"),  # Select between ["train", "test", "dev"] for retail
+    "user_strategy": os.getenv("TAU_USER_STRATEGY", "llm"),  # Select between ["llm", "react", "verify", "reflection"]
     "model_provider": "auto_router",  # Unused, required
     "model": "qwen3-4b",  # Unused, required
 }
-# Replace with your actual API key for user sim
-# GEMINI_API_KEY = "NONE"
-# os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-if OPENROUTER_API_KEY is None:
-    raise ValueError("OPENROUTER_API_KEY is not set")
-os.environ["OPENROUTER_API_KEY"] = OPENROUTER_API_KEY
+
+# Get API key from environment variable specified by TAU_USER_API_KEY_VAR
+# Default to OPENROUTER_API_KEY for backward compatibility
+api_key_var = os.getenv("TAU_USER_API_KEY_VAR", "OPENROUTER_API_KEY")
+api_key = os.getenv(api_key_var)
+if api_key is None:
+    logger.warning(f"{api_key_var} is not set. User simulation may fail.")
+else:
+    # Set the API key in environment for tau-bench to use
+    os.environ[api_key_var] = api_key
+
 tau_config = RunConfig(**TAU_CONFIGS)
 
 
