@@ -249,6 +249,10 @@ class TrainableAgentTau2:
         tools = info.get("tools", [])
         policy = info.get("policy", "")
 
+        # Convert Tool objects to OpenAI schema format for tokenizer
+        # τ²-bench returns Tool objects, but tokenizer expects JSON schemas
+        tools_schema = [tool.openai_schema for tool in tools] if tools else None
+
         # Build system prompt
         system_prompt = f"<instructions>\n{policy}\n</instructions>"
 
@@ -260,7 +264,7 @@ class TrainableAgentTau2:
             conversation_messages,
             tokenize=False,
             add_generation_prompt=False,
-            tools=tools,
+            tools=tools_schema,
         )
         prompt_token_ids = state.tokenizer(prompt_text, add_special_tokens=False)["input_ids"]
 
@@ -286,7 +290,7 @@ class TrainableAgentTau2:
                 conversation_messages,
                 tokenize=False,
                 add_generation_prompt=True,
-                tools=tools,
+                tools=tools_schema,
             )
 
             # Call LLM via sglang
