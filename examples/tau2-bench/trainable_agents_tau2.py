@@ -102,11 +102,6 @@ class TrainableAgentTau2:
             },
         )
 
-        # Initialize tokenizer for tracking
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            rollout_args.tokenizer_path, trust_remote_code=True
-        )
-
         # For tool parsing - copy from tau1-bench if available
         try:
             from openai_tool_adapter import create_openai_adapter
@@ -354,7 +349,7 @@ class TrainableAgentTau2:
                 # Track assistant tokens
                 conversation_messages.append({"role": "assistant", "content": response})
                 token_delta, mask_delta = self._get_token_delta(
-                    self.tokenizer, conversation_messages, "assistant"
+                    state.tokenizer, conversation_messages, "assistant"
                 )
                 response_token_ids.extend(token_delta)
                 loss_masks.extend(mask_delta)
@@ -373,7 +368,7 @@ class TrainableAgentTau2:
                 conversation_messages = self._observation_to_messages(observation, system_prompt)
                 if len(conversation_messages) > len(conversation_messages) - 1:
                     token_delta, mask_delta = self._get_token_delta(
-                        self.tokenizer, conversation_messages, "user"
+                        state.tokenizer, conversation_messages, "user"
                     )
                     response_token_ids.extend(token_delta)
                     loss_masks.extend(mask_delta)
