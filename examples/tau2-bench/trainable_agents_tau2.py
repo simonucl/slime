@@ -350,10 +350,13 @@ class TrainableAgentTau2:
         # Build final result
         final_messages = self._observation_to_messages(observation, system_prompt)
 
+        # Store number of agent turns for metrics
+        num_turns = turn + 1 if terminated or truncated else turn
+
         res.reward = total_reward
         res.info = {
             "task_id": task.id,
-            "turns": turn + 1,
+            "turns": num_turns,
             "terminated": terminated,
             "truncated": truncated,
             **info,
@@ -365,11 +368,6 @@ class TrainableAgentTau2:
             [msg.get("content", "") for msg in final_messages if msg["role"] == "assistant"]
         )
         res.response_length = len(loss_masks)
-
-        logger.debug(
-            f"asolve completed: reward={res.reward}, status={res.status}, "
-            f"response_length={res.response_length}, turns={turn + 1}"
-        )
 
         return res
 

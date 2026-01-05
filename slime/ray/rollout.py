@@ -620,6 +620,12 @@ def compute_metrics_from_samples(args, samples):
     log_dict |= _compute_reward_cat_metrics(args, samples)
     log_dict["repetition_frac"] = np.mean([int(has_repetition(s.response)) for s in samples]).item()
     log_dict["truncated_ratio"] = np.mean([int(s.status == Sample.Status.TRUNCATED) for s in samples]).item()
+
+    # Compute average number of turns if available in metadata
+    turns = [sample.metadata.get("num_turns", 0) for sample in samples if sample.metadata]
+    if turns and any(t > 0 for t in turns):
+        log_dict["avg_turns"] = np.mean([t for t in turns if t > 0]).item()
+
     return log_dict
 
 

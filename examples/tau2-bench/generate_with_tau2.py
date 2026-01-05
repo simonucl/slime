@@ -63,13 +63,8 @@ def res_to_sample(res: InteractionResult, task_index: int) -> Sample:
     }
     status = status_mapping.get(res.status, "aborted")
 
-    # Debug logging for response tracking
-    logger.debug(
-        f"res_to_sample: response_length="
-        f"{res.response_length if hasattr(res, 'response_length') else 'None'}, "
-        f"loss_mask_len={len(res.loss_mask) if res.loss_mask else 'None'}, "
-        f"tokens_len={len(res.tokens) if res.tokens else 'None'}"
-    )
+    # Extract turns from info for metrics tracking
+    num_turns = res.info.get("turns", 0) if res.info else 0
 
     # Create sample with basic information
     sample = Sample(
@@ -80,7 +75,7 @@ def res_to_sample(res: InteractionResult, task_index: int) -> Sample:
         reward=res.reward,
         loss_mask=res.loss_mask,
         status=status,
-        metadata=res.info,
+        metadata={**res.info, "num_turns": num_turns} if res.info else {"num_turns": num_turns},
     )
 
     # Ensure response_length is set correctly
@@ -96,7 +91,6 @@ def res_to_sample(res: InteractionResult, task_index: int) -> Sample:
             sample.response_length = len(res.tokens)
         else:
             sample.response_length = 0
-            logger.debug(f"res_to_sample: Set response_length={sample.response_length}")
 
     return sample
 
@@ -125,7 +119,6 @@ async def generate(args: dict[str, Any], sample: Sample, sampling_params: dict) 
 
     # Extract task index from sample prompt
     task_index = int(sample.prompt)
-    logger.info(f"Starting agent-environment interaction for τ²-bench task {task_index}")
 
     # Get the task from τ²-bench
     tasks = get_tasks(
@@ -137,7 +130,6 @@ async def generate(args: dict[str, Any], sample: Sample, sampling_params: dict) 
         raise ValueError(f"Task index {task_index} out of range. Available tasks: {len(tasks)}")
 
     task = tasks[task_index]
-    logger.info(f"Task ID: {task.id}, Description: {task.user_scenario.persona if hasattr(task.user_scenario, 'persona') else 'N/A'}")
 
     # Create trainable agent with τ²-bench's official components
     agent = agent_factory_tau2(
@@ -163,8 +155,5 @@ async def generate(args: dict[str, Any], sample: Sample, sampling_params: dict) 
 
     # Convert to slime Sample format
     result_sample = res_to_sample(interaction_result, task_index)
-
-    logger.info(f"Finished agent-environment interaction for τ²-bench task {task_index}")
-    logger.info(f"Reward: {result_sample.reward}, Status: {result_sample.status}")
 
     return result_sample
