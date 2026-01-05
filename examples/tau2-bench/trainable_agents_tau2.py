@@ -102,22 +102,8 @@ class TrainableAgentTau2:
             },
         )
 
-        # For tool parsing - copy from tau1-bench if available
-        try:
-            from openai_tool_adapter import create_openai_adapter
-
-            tools_info = [tool.model_dump() for tool in self.env._environment.get_tools()]
-            self.openai_adapter = create_openai_adapter(
-                tools_info=tools_info, parser_type="qwen25"
-            )
-            self.has_tool_parser = True
-        except ImportError:
-            logger.warning(
-                "openai_tool_adapter not found. Using simplified tool parsing. "
-                "For production, copy openai_tool_adapter.py from tau1-bench."
-            )
-            self.openai_adapter = None
-            self.has_tool_parser = False
+        # τ²-bench uses LiteLLM internally with tool.openai_schema
+        # No need for custom tool parser - the gym env handles tool parsing internally
 
     async def _call_llm(self, url: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Make an LLM call to sglang server"""
@@ -127,10 +113,11 @@ class TrainableAgentTau2:
         """
         Parse LLM response and return action string.
 
-        The action can be:
-        - Plain text message: "Hello, how can I help?"
-        - Tool call (function format): "search_flights(origin='NYC', destination='LAX')"
-        - Tool call (JSON format): '{"name": "search_flights", "arguments": {"origin": "NYC"}}'
+        τ²-bench AgentGymEnv accepts two formats:
+        1. Plain text message: "Hello, how can I help?"
+        2. Tool call (JSON format): '{"name": "search_flights", "arguments": {"origin": "NYC"}}'
+
+        The gym env internally parses these - we just need to clean up the response.
 
         Args:
             response: Raw response text from LLM
@@ -142,39 +129,8 @@ class TrainableAgentTau2:
         if response.endswith("<|im_end|>"):
             response = response[:-10]
 
-        if not self.has_tool_parser:
-            # Simplified parsing - just return the response
-            # The gym env will try to parse it
-            return response
-
-        # Use tool parser
-        result = self.openai_adapter.parse_response_to_openai_format(response)
-
-        if not result["success"]:
-            logger.warning(f"Tool parsing failed: {result['error']}, returning raw response")
-            return response
-
-        parsed = result["parsed_result"]
-        normal_text = parsed["normal_text"]
-        calls = parsed["calls"]
-
-        # If there are tool calls, format them for gym env
-        if calls:
-            # AgentGymEnv expects function format: "func_name(arg1='val1', arg2='val2')"
-            if len(calls) > 1:
-                logger.warning("Multiple tool calls detected, using only the first one")
-
-            call = calls[0]
-            args_str = ", ".join(
-                [
-                    f"{k}={repr(v)}"
-                    for k, v in json.loads(call["parameters"]).items()
-                ]
-            )
-            return f"{call['name']}({args_str})"
-
-        # No tool calls, return plain text
-        return normal_text
+        # AgentGymEnv handles parsing internally - just return cleaned response
+        return response.strip()
 
     def _get_token_delta(
         self, tokenizer: AutoTokenizer, messages: list[dict], last_role: str
