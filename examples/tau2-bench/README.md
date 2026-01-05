@@ -67,6 +67,13 @@ PYTHONPATH=/root/Megatron-LM python tools/convert_hf_to_torch_dist.py \
     --save /root/Qwen3-4B-Instruct-2507_torch_dist
 ```
 
+### Prepare the data
+
+```bash
+cd /root/slime
+python examples/tau2-bench/prepare_tau2_data.py
+```
+
 ## Configuration
 
 ### Quick Configuration via Environment Variables
