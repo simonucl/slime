@@ -21,8 +21,18 @@ else
 fi
 echo "HAS_NVLINK: $HAS_NVLINK (detected $NVLINK_COUNT NVLink references)"
 
+# =============================================================================
+# Path Configuration
+# =============================================================================
+export ROOT_DIR=${ROOT_DIR:-"/root"}
+export MODEL_DIR=${MODEL_DIR:-"${ROOT_DIR}"}
+export MODEL_NAME=${MODEL_NAME:-"Qwen3-4B-Instruct-2507"}
+export RAY_TMPDIR=${RAY_TMPDIR:-"${ROOT_DIR}/shared/ray_temp"}
+export DATA_DIR=${DATA_DIR:-"${ROOT_DIR}/tau2_bench_data"}
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-source "${SCRIPT_DIR}/../../scripts/models/qwen3-4B-Instruct-2507.sh"
+export SETTINGS_DIR=${SETTINGS_DIR:-"${SCRIPT_DIR}/../../scripts"}
+source "${SETTINGS_DIR}/models/qwen3-4B-Instruct-2507.sh"
 
 # =============================================================================
 # τ²-bench Configuration (via environment variables)
@@ -56,16 +66,16 @@ echo "  Checkpoint Suffix: $CHECKPOINT_SUFFIX"
 echo ""
 
 CKPT_ARGS=(
-   --hf-checkpoint /root/Qwen3-4B-Instruct-2507/
-   --ref-load /root/Qwen3-4B-Instruct-2507_torch_dist/
-   --load /root/Qwen3-4B-Instruct-2507_${CHECKPOINT_SUFFIX}/
-   --save /root/Qwen3-4B-Instruct-2507_${CHECKPOINT_SUFFIX}/
+   --hf-checkpoint ${MODEL_DIR}/${MODEL_NAME}/
+   --ref-load ${MODEL_DIR}/${MODEL_NAME}_torch_dist/
+   --load ${MODEL_DIR}/${MODEL_NAME}_${CHECKPOINT_SUFFIX}/
+   --save ${MODEL_DIR}/${MODEL_NAME}_${CHECKPOINT_SUFFIX}/
    --save-interval 20
 )
 
 ROLLOUT_ARGS=(
    # τ²-bench uses task indices as prompts, created by prepare_tau2_data.py
-   --prompt-data /root/tau2_bench_data/retail_train_tasks.jsonl
+   --prompt-data ${DATA_DIR}/retail_train_tasks.jsonl
    --input-key index
    --rollout-shuffle
    --num-rollout 500
@@ -81,7 +91,7 @@ ROLLOUT_ARGS=(
 EVAL_ARGS=(
    --eval-interval 5
    # τ²-bench eval data
-   --eval-prompt-data retail-dev /root/tau2_bench_data/retail_dev_tasks.jsonl
+   --eval-prompt-data retail-dev ${DATA_DIR}/retail_dev_tasks.jsonl
    --n-samples-per-eval-prompt 1
    --eval-max-response-len 8192
    --eval-top-k 1
@@ -155,7 +165,7 @@ export MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
 
 # If you want more or less GPUs, change this parameter
 NUM_GPUS=8
-ray start --head --node-ip-address ${MASTER_ADDR} --num-gpus ${NUM_GPUS} --disable-usage-stats --dashboard-host=0.0.0.0 --dashboard-port=8265 --temp-dir /root/shared/ray_temp
+ray start --head --node-ip-address ${MASTER_ADDR} --num-gpus ${NUM_GPUS} --disable-usage-stats --dashboard-host=0.0.0.0 --dashboard-port=8265 --temp-dir ${RAY_TMPDIR}
 
 RUNTIME_ENV_JSON="{
   \"env_vars\": {
