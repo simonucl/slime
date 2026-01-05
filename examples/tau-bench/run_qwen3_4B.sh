@@ -5,10 +5,8 @@ pkill -9 sglang
 sleep 3
 ray stop --force
 pkill -9 ray
-pkill -9 python
 sleep 3
 pkill -9 ray
-pkill -9 python
 
 set -ex
 
@@ -119,9 +117,8 @@ OPTIMIZER_ARGS=(
 WANDB_ARGS=(
    --use-wandb
    --wandb-project slime-tau-bench
-   --wandb-group qwen3-4B
+   --wandb-group qwen3-4B-${CHECKPOINT_SUFFIX}
    --wandb-key ${WANDB_API_KEY}
-   --wandb-run-name qwen3-4B-${CHECKPOINT_SUFFIX}
 )
 
 SGLANG_ARGS=(
