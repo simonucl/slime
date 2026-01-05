@@ -71,11 +71,11 @@ ROLLOUT_ARGS=(
    --input-key index
    --rollout-shuffle
    --num-rollout 500
-   --rollout-batch-size 32
+   --rollout-batch-size 4
    --n-samples-per-prompt 8
-   --rollout-max-response-len 16384
+   --rollout-max-response-len 8192
    --rollout-temperature 1
-   --global-batch-size 256
+   --global-batch-size 32
    --dynamic-sampling-filter-path slime.rollout.filter_hub.dynamic_sampling_filters.check_reward_nonzero_std
    --balance-data
 )
@@ -85,7 +85,7 @@ EVAL_ARGS=(
    # τ²-bench eval data
    --eval-prompt-data retail-dev /root/tau2_bench_data/retail_dev_tasks.jsonl
    --n-samples-per-eval-prompt 1
-   --eval-max-response-len 16384
+   --eval-max-response-len 8192
    --eval-top-k 1
 )
 
