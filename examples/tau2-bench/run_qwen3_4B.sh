@@ -91,7 +91,7 @@ ROLLOUT_ARGS=(
 EVAL_ARGS=(
    --eval-interval 5
    # τ²-bench eval data
-   --eval-prompt-data retail-dev ${DATA_DIR}/retail_dev_tasks.jsonl
+   --eval-prompt-data retail-test ${DATA_DIR}/retail_test_tasks.jsonl
    --n-samples-per-eval-prompt 1
    --eval-max-response-len 8192
    --eval-top-k 1
