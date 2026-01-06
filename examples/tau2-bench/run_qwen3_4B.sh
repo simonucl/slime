@@ -88,11 +88,8 @@ ROLLOUT_ARGS=(
 
 EVAL_ARGS=(
    --eval-interval 5
-   # τ²-bench eval data
-   --eval-prompt-data retail-test ${DATA_DIR}/retail_test_tasks.jsonl
-   --n-samples-per-eval-prompt 1
-   --eval-max-response-len 8192
-   --eval-top-k 1
+   --eval-config ${SCRIPT_DIR}/eval_config.yaml
+   --log-passrate
 )
 
 PERF_ARGS=(
@@ -154,8 +151,9 @@ MISC_ARGS=(
 )
 
 CUSTOM_ARGS=(
-   # Use τ²-bench generate function
+   # Use τ²-bench generate function for both train and eval
    --custom-generate-function-path generate_with_tau2.generate
+   --eval-function-path generate_with_tau2.generate
 )
 
 # launch the master node of ray in container

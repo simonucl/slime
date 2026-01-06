@@ -93,7 +93,7 @@ def res_to_sample(res: InteractionResult, task_index: int) -> Sample:
     return sample
 
 
-async def generate(args: dict[str, Any], sample: Sample, sampling_params: dict) -> Sample:
+async def generate(args: dict[str, Any], sample: Sample, sampling_params: dict, evaluation: bool = False) -> Sample:
     """
     Generate a complete agent-environment interaction trajectory for τ²-bench.
 
@@ -101,10 +101,15 @@ async def generate(args: dict[str, Any], sample: Sample, sampling_params: dict) 
     environment, initializes a trainable agent, and executes a full interaction
     trajectory. The result is converted to slime's Sample format for training.
 
+    During evaluation, supports per-dataset user model configuration via sample.metadata
+    (set by metadata_overrides in YAML config). This allows evaluating the agent
+    against different user simulator models.
+
     Args:
         args: Rollout arguments from slime training pipeline
         sample: Sample containing task index in prompt field
         sampling_params: LLM sampling parameters
+        evaluation: Whether this is an evaluation run (enables per-dataset config)
 
     Returns:
         Sample object containing the complete interaction trajectory
@@ -118,10 +123,28 @@ async def generate(args: dict[str, Any], sample: Sample, sampling_params: dict) 
     # Extract task index from sample prompt
     task_index = int(sample.prompt)
 
+    # Get user model config from metadata if in eval mode, else use global config
+    if evaluation and sample.metadata:
+        # Use per-dataset config from metadata_overrides (set in YAML)
+        user_model = sample.metadata.get("user_model", TAU2_CONFIGS["user_model"])
+        user_base_url = sample.metadata.get("user_base_url", TAU2_CONFIGS["user_base_url"])
+        user_api_key_var = sample.metadata.get("user_api_key_var", TAU2_CONFIGS["user_api_key_var"])
+        domain = sample.metadata.get("domain", TAU2_CONFIGS["domain"])
+        task_split = sample.metadata.get("task_split", TAU2_CONFIGS["task_split"])
+        max_turns = sample.metadata.get("max_turns", TAU2_CONFIGS["max_turns"])
+    else:
+        # Use global config for training
+        user_model = TAU2_CONFIGS["user_model"]
+        user_base_url = TAU2_CONFIGS["user_base_url"]
+        user_api_key_var = TAU2_CONFIGS["user_api_key_var"]
+        domain = TAU2_CONFIGS["domain"]
+        task_split = TAU2_CONFIGS["task_split"]
+        max_turns = TAU2_CONFIGS["max_turns"]
+
     # Get the task from τ²-bench
     tasks = get_tasks(
-        task_set_name=TAU2_CONFIGS["domain"],
-        task_split_name=TAU2_CONFIGS["task_split"],
+        task_set_name=domain,
+        task_split_name=task_split,
     )
 
     if task_index >= len(tasks):
@@ -131,12 +154,12 @@ async def generate(args: dict[str, Any], sample: Sample, sampling_params: dict) 
 
     # Create trainable agent with τ²-bench's official components
     agent = agent_factory_tau2(
-        domain=TAU2_CONFIGS["domain"],
+        domain=domain,
         agent_type=TAU2_CONFIGS["agent_type"],
-        user_model=TAU2_CONFIGS["user_model"],
-        user_base_url=TAU2_CONFIGS["user_base_url"],
-        user_api_key_var=TAU2_CONFIGS["user_api_key_var"],
-        max_turns=TAU2_CONFIGS["max_turns"],
+        user_model=user_model,
+        user_base_url=user_base_url,
+        user_api_key_var=user_api_key_var,
+        max_turns=max_turns,
         rollout_args=args,
         sampling_params=sampling_params,
     )
@@ -147,7 +170,7 @@ async def generate(args: dict[str, Any], sample: Sample, sampling_params: dict) 
         task=task,
         rollout_args=args,
         sampling_params=sampling_params,
-        max_turns=TAU2_CONFIGS["max_turns"],
+        max_turns=max_turns,
     )
 
     # Convert to slime Sample format
