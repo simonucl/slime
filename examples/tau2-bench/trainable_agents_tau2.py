@@ -139,84 +139,152 @@ class TrainableAgentTau2:
         # AgentGymEnv handles parsing internally - just return cleaned response
         return response.strip()
 
-    def _get_token_delta(
-        self, tokenizer: AutoTokenizer, messages: list[dict], last_role: str
-    ) -> tuple[list[int], list[int]]:
+    def _compute_tokens_from_trajectory(
+        self,
+        messages: list[dict[str, Any]],
+        tokenizer: AutoTokenizer,
+        tools_schema: list[dict] | None,
+    ) -> tuple[list[int], list[int], list[int]]:
         """
-        Calculate token delta for multi-turn conversations.
+        Compute token IDs and loss masks from complete message trajectory.
+
+        This processes the full conversation and creates:
+        - prompt_tokens: Initial system message
+        - response_tokens: All conversation tokens after system message
+        - loss_masks: 1 for assistant messages, 0 for user/tool messages
 
         Args:
+            messages: Complete conversation in OpenAI format
             tokenizer: Tokenizer instance
-            messages: Conversation messages
-            last_role: Role of the last message added ("assistant" or other)
+            tools_schema: Tool schemas for chat template
 
         Returns:
-            Tuple of (token_ids, loss_mask)
+            Tuple of (prompt_token_ids, response_token_ids, loss_masks)
         """
-        curr = tokenizer.apply_chat_template(
-            messages, add_generation_prompt=False, tokenize=False
+        # Tokenize just the system message as prompt
+        system_only = messages[:1]
+        prompt_text = tokenizer.apply_chat_template(
+            system_only,
+            tokenize=False,
+            add_generation_prompt=False,
+            tools=tools_schema,
         )
-        token_ids = []
-        loss_mask = []
+        prompt_token_ids = tokenizer(prompt_text, add_special_tokens=False)["input_ids"]
 
-        # Case 1: last message is an assistant response
-        if last_role == "assistant":
-            prev = tokenizer.apply_chat_template(
-                messages[:-1], add_generation_prompt=True, tokenize=False
-            )
-            new_tokens = tokenizer.encode(curr[len(prev) :], add_special_tokens=False)
-            token_ids += new_tokens
-            loss_mask += [1] * len(new_tokens)  # Mask assistant tokens for training
-        else:
-            # Case 2: last message is from user/tool/environment
-            prev = tokenizer.apply_chat_template(
-                messages[:-1], add_generation_prompt=False, tokenize=False
-            )
-            new_tokens = tokenizer.encode(curr[len(prev) :], add_special_tokens=False)
-            token_ids += new_tokens
-            loss_mask += [0] * len(new_tokens)  # Don't train on non-assistant tokens
+        # Now process the rest of the conversation message by message
+        response_token_ids = []
+        loss_masks = []
 
-        return token_ids, loss_mask
+        for i in range(1, len(messages)):
+            # Get conversation up to this point
+            prev_messages = messages[:i]
+            curr_messages = messages[: i + 1]
+
+            # Check if this is an assistant message
+            is_assistant = curr_messages[-1]["role"] == "assistant"
+
+            prev_text = tokenizer.apply_chat_template(
+                prev_messages,
+                tokenize=False,
+                add_generation_prompt=is_assistant,
+                tools=tools_schema,
+            )
+
+            # Tokenize current state
+            curr_text = tokenizer.apply_chat_template(
+                curr_messages,
+                tokenize=False,
+                add_generation_prompt=False,
+                tools=tools_schema,
+            )
+
+            # Get the delta
+            if len(curr_text) > len(prev_text):
+                delta_text = curr_text[len(prev_text) :]
+                delta_tokens = tokenizer.encode(delta_text, add_special_tokens=False)
+
+                response_token_ids.extend(delta_tokens)
+
+                # Set loss mask: 1 for assistant, 0 for others
+                if is_assistant:
+                    loss_masks.extend([1] * len(delta_tokens))
+                else:
+                    loss_masks.extend([0] * len(delta_tokens))
+
+        return prompt_token_ids, response_token_ids, loss_masks
 
     def _observation_to_messages(
-        self, observation: str, system_prompt: str
+        self, observation: list, system_prompt: str
     ) -> list[dict[str, Any]]:
         """
-        Convert gym observation to OpenAI-style messages.
+        Convert gym observation (list of Message objects) to OpenAI-style messages.
 
-        The observation from AgentGymEnv is a formatted string like:
-        "user: Hello\nassistant: Hi there!\ntool: {...}"
-
-        We need to convert this to message format for the LLM.
+        The observation from AgentGymEnv is a list of Message objects (AssistantMessage,
+        UserMessage, ToolMessage). We convert these directly to OpenAI format.
 
         Args:
-            observation: Observation string from gym env
+            observation: List of Message objects from gym env
             system_prompt: System prompt from env info
 
         Returns:
-            List of message dictionaries
+            List of message dictionaries in OpenAI format
         """
+        from tau2.data_model.message import AssistantMessage, UserMessage, ToolMessage
+
         messages = [{"role": "system", "content": system_prompt}]
 
-        # Parse observation into messages
-        # Format: "role: content\nrole: content\n..."
+        # Convert Message objects to OpenAI format
         if not observation:
             return messages
 
-        for line in observation.split("\n"):
-            if not line.strip():
-                continue
-
-            if ": " in line:
-                role, content = line.split(": ", 1)
-                role = role.strip()
-                content = content.strip()
-
-                # Map roles
-                if role == "assistant":
-                    messages.append({"role": "assistant", "content": content})
-                elif role in ["user", "tool"]:
-                    messages.append({"role": "user", "content": content})
+        for msg in observation:
+            if isinstance(msg, AssistantMessage):
+                if msg.content:
+                    messages.append({"role": "assistant", "content": msg.content})
+                elif msg.tool_calls:
+                    # Convert tool calls to OpenAI format
+                    tool_calls = [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.name,
+                                "arguments": json.dumps(tc.arguments)
+                                if isinstance(tc.arguments, dict)
+                                else str(tc.arguments),
+                            },
+                        }
+                        for tc in msg.tool_calls
+                    ]
+                    messages.append({"role": "assistant", "tool_calls": tool_calls})
+            elif isinstance(msg, UserMessage):
+                if msg.content:
+                    messages.append({"role": "user", "content": msg.content})
+                elif msg.tool_calls:
+                    # User tool calls - convert to OpenAI format
+                    tool_calls = [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.name,
+                                "arguments": json.dumps(tc.arguments)
+                                if isinstance(tc.arguments, dict)
+                                else str(tc.arguments),
+                            },
+                        }
+                        for tc in msg.tool_calls
+                    ]
+                    messages.append({"role": "user", "tool_calls": tool_calls})
+            elif isinstance(msg, ToolMessage):
+                # Tool messages need special handling in OpenAI format
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": msg.id,
+                        "content": msg.content or "",
+                    }
+                )
 
         return messages
 
@@ -233,8 +301,8 @@ class TrainableAgentTau2:
         This method:
         1. Resets the gym environment
         2. Loops: observe -> generate action -> step environment
-        3. Tracks tokens for training
-        4. Returns results in slime format
+        3. Collects full trajectory
+        4. Computes tokens from complete trajectory
 
         Args:
             task: τ²-bench task to solve
@@ -251,7 +319,7 @@ class TrainableAgentTau2:
         url = f"http://{rollout_args.sglang_router_ip}:{rollout_args.sglang_router_port}/generate"
 
         # Reset environment
-        observation, info = self.env.reset()
+        _, info = self.env.reset()
 
         # Get tools and policy from info
         tools = info.get("tools", [])
@@ -264,32 +332,21 @@ class TrainableAgentTau2:
         # Build system prompt
         system_prompt = f"<instructions>\n{policy}\n</instructions>"
 
-        # Convert initial observation to messages
-        conversation_messages = self._observation_to_messages(observation, system_prompt)
-
-        # Generate initial prompt tokens
-        prompt_text = state.tokenizer.apply_chat_template(
-            conversation_messages,
-            tokenize=False,
-            add_generation_prompt=False,
-            tools=tools_schema,
-        )
-        prompt_token_ids = state.tokenizer(prompt_text, add_special_tokens=False)["input_ids"]
-
         # Initialize tracking
-        response_token_ids = []
-        loss_masks = []
         total_reward = 0.0
         terminated = False
         truncated = False
 
         # Initialize result
         res = InteractionResult(
-            prompt=prompt_text, reward=0, messages=[], info={"task_id": task.id}
+            prompt="", reward=0, messages=[], info={"task_id": task.id}
         )
 
         # Main interaction loop
         for turn in range(max_turns):
+            # Get actual Message objects from gym agent
+            observation = self.env._agent.observation
+
             # Build current conversation
             conversation_messages = self._observation_to_messages(observation, system_prompt)
 
@@ -314,14 +371,6 @@ class TrainableAgentTau2:
                 response = output["text"]
                 action = self._parse_llm_response(response)
 
-                # Track assistant tokens
-                conversation_messages.append({"role": "assistant", "content": response})
-                token_delta, mask_delta = self._get_token_delta(
-                    state.tokenizer, conversation_messages, "assistant"
-                )
-                response_token_ids.extend(token_delta)
-                loss_masks.extend(mask_delta)
-
             except Exception as e:
                 logger.error(f"LLM call failed: {e}")
                 res.status = Status.ABORTED
@@ -329,17 +378,8 @@ class TrainableAgentTau2:
 
             # Step environment with the action
             try:
-                observation, reward, terminated, truncated, info = self.env.step(action)
+                _, reward, terminated, truncated, info = self.env.step(action)
                 total_reward = reward  # Keep latest reward
-
-                # Track environment response tokens
-                conversation_messages = self._observation_to_messages(observation, system_prompt)
-                if len(conversation_messages) > len(conversation_messages) - 1:
-                    token_delta, mask_delta = self._get_token_delta(
-                        state.tokenizer, conversation_messages, "user"
-                    )
-                    response_token_ids.extend(token_delta)
-                    loss_masks.extend(mask_delta)
 
             except Exception as e:
                 logger.error(f"Environment step failed: {e}")
@@ -355,12 +395,27 @@ class TrainableAgentTau2:
                 res.status = Status.TRUNCATED
                 break
 
-        # Build final result
+        # After interaction completes, process the full trajectory for training
+        observation = self.env._agent.observation
         final_messages = self._observation_to_messages(observation, system_prompt)
+
+        # Compute tokens and loss masks from complete trajectory
+        prompt_token_ids, response_token_ids, loss_masks = self._compute_tokens_from_trajectory(
+            final_messages, state.tokenizer, tools_schema
+        )
+
+        # Build prompt text (first conversation state)
+        prompt_text = state.tokenizer.apply_chat_template(
+            final_messages[:1],  # Just system message for prompt
+            tokenize=False,
+            add_generation_prompt=False,
+            tools=tools_schema,
+        )
 
         # Store number of agent turns for metrics
         num_turns = turn + 1 if terminated or truncated else turn
 
+        res.prompt = prompt_text
         res.reward = total_reward
         res.info = {
             "task_id": task.id,
@@ -373,7 +428,7 @@ class TrainableAgentTau2:
         res.loss_mask = loss_masks
         res.tokens = prompt_token_ids + response_token_ids
         res.response = "".join(
-            [msg.get("content", "") for msg in final_messages if msg["role"] == "assistant"]
+            [msg['content'] for msg in final_messages if msg["role"] == "assistant"]
         )
         res.response_length = len(loss_masks)
 
