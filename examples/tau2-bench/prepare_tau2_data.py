@@ -31,6 +31,7 @@ def prepare_domain_split_data(
     domain: str,
     split: str,
     output_dir: Path,
+    include_domain_metadata: bool = False,
 ) -> int:
     """
     Prepare data for a specific domain and split.
@@ -39,6 +40,7 @@ def prepare_domain_split_data(
         domain: Domain name (retail, airline, telecom, mock)
         split: Split name (train, dev, test)
         output_dir: Output directory for JSONL files
+        include_domain_metadata: If True, include domain and task_split in metadata
 
     Returns:
         Number of tasks created
@@ -60,10 +62,81 @@ def prepare_domain_split_data(
     # Write task indices
     with open(output_file, "w") as f:
         for i in range(len(tasks)):
-            f.write(json.dumps({"index": i}) + "\n")
+            if include_domain_metadata:
+                entry = {
+                    "index": i,
+                    "metadata": {
+                        "domain": domain,
+                        "task_split": split,
+                    }
+                }
+            else:
+                entry = {"index": i}
+            f.write(json.dumps(entry) + "\n")
 
     print(f"Created {output_file} with {len(tasks)} tasks")
     return len(tasks)
+
+
+def create_multi_domain_dataset(
+    domains: list[str],
+    split: str,
+    output_dir: Path,
+    output_name: str = None,
+) -> int:
+    """
+    Create a multi-domain dataset by concatenating tasks from multiple domains.
+
+    Each task entry includes metadata indicating which domain it belongs to,
+    so the generate function can load the correct task.
+
+    Args:
+        domains: List of domain names to concatenate (e.g., ["retail", "telecom"])
+        split: Split name (train, test)
+        output_dir: Output directory for JSONL files
+        output_name: Name for output file (default: "multi_domain_{split}_tasks.jsonl")
+
+    Returns:
+        Total number of tasks created
+    """
+    if output_name is None:
+        output_name = f"multi_domain_{split}_tasks.jsonl"
+
+    output_file = output_dir / output_name
+    total_tasks = 0
+
+    print(f"\nCreating multi-domain dataset: {output_file}")
+    print(f"  Domains: {', '.join(domains)}")
+    print(f"  Split: {split}")
+
+    with open(output_file, "w") as f:
+        for domain in domains:
+            try:
+                tasks = get_tasks(task_set_name=domain, task_split_name=split)
+            except Exception as e:
+                print(f"  Warning: Could not load {domain}/{split}: {e}")
+                continue
+
+            if not tasks:
+                print(f"  Warning: No tasks found for {domain}/{split}")
+                continue
+
+            # Write tasks with domain metadata
+            for i in range(len(tasks)):
+                entry = {
+                    "index": i,
+                    "metadata": {
+                        "domain": domain,
+                        "task_split": split,
+                    }
+                }
+                f.write(json.dumps(entry) + "\n")
+
+            print(f"  Added {len(tasks)} tasks from {domain}")
+            total_tasks += len(tasks)
+
+    print(f"Created {output_file} with {total_tasks} total tasks")
+    return total_tasks
 
 
 def main():
@@ -80,6 +153,19 @@ def main():
         nargs="+",
         default=["retail", "airline", "telecom", "mock"],
         help="Domains to prepare (default: all)",
+    )
+    parser.add_argument(
+        "--multi-domain-train",
+        type=str,
+        nargs="+",
+        default=None,
+        help="Create multi-domain training dataset from specified domains (e.g., --multi-domain-train retail telecom)",
+    )
+    parser.add_argument(
+        "--multi-domain-name",
+        type=str,
+        default=None,
+        help="Output name for multi-domain dataset (default: multi_domain_train_tasks.jsonl)",
     )
     args = parser.parse_args()
 
@@ -127,6 +213,19 @@ def main():
 
         print(f"Total for {domain}: {domain_tasks} tasks")
 
+    # Create multi-domain dataset if requested
+    if args.multi_domain_train:
+        print()
+        print("=" * 80)
+        multi_tasks = create_multi_domain_dataset(
+            domains=args.multi_domain_train,
+            split="train",
+            output_dir=output_dir,
+            output_name=args.multi_domain_name,
+        )
+        summary.append(f"  Multi-domain train: {multi_tasks} tasks ({', '.join(args.multi_domain_train)})")
+        total_tasks += multi_tasks
+
     # Print summary
     print()
     print("=" * 80)
@@ -141,9 +240,13 @@ def main():
     print("1. Set your API key for user simulation:")
     print("   export OPENAI_API_KEY='your-key-here'")
     print()
-    print("2. Update run_qwen3_4B.sh with the correct paths:")
-    print(f"   --prompt-data {output_dir}/retail_train_tasks.jsonl")
-    print(f"   --eval-prompt-data retail-dev {output_dir}/retail_dev_tasks.jsonl")
+    if args.multi_domain_train:
+        multi_file = args.multi_domain_name or "multi_domain_train_tasks.jsonl"
+        print("2. Update run_qwen3_4B.sh to use multi-domain dataset:")
+        print(f"   --prompt-data {output_dir}/{multi_file}")
+    else:
+        print("2. Update run_qwen3_4B.sh with the correct paths:")
+        print(f"   --prompt-data {output_dir}/retail_train_tasks.jsonl")
     print()
     print("3. Run training:")
     print("   bash examples/tau2-bench/run_qwen3_4B.sh")
