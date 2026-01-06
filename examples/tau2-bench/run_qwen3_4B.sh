@@ -151,9 +151,8 @@ MISC_ARGS=(
 )
 
 CUSTOM_ARGS=(
-   # Use τ²-bench generate function for both train and eval
+   # Use τ²-bench generate function
    --custom-generate-function-path generate_with_tau2.generate
-   --eval-function-path generate_with_tau2.generate
 )
 
 # launch the master node of ray in container
