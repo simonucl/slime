@@ -50,9 +50,7 @@ export TAU2_USER_BASE_URL=${TAU2_USER_BASE_URL:-"https://api.openai.com/v1"}
 export TAU2_USER_API_KEY_VAR=${TAU2_USER_API_KEY_VAR:-"OPENAI_API_KEY"}
 
 # Episode configuration
-export TAU2_MAX_STEPS=${TAU2_MAX_STEPS:-200}    # Max environment steps per episode
-export TAU2_MAX_ERRORS=${TAU2_MAX_ERRORS:-10}   # Max errors before abort
-export TAU2_MAX_TURNS=${TAU2_MAX_TURNS:-30}     # Max agent turns per episode
+export TAU2_MAX_TURNS=${TAU2_MAX_TURNS:-30}     # Max total turns (user + agent messages) per episode
 
 # Checkpoint naming
 CHECKPOINT_SUFFIX=${CHECKPOINT_SUFFIX:-"slime"}

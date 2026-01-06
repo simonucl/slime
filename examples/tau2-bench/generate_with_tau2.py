@@ -29,9 +29,7 @@ TAU2_CONFIGS = {
     "user_base_url": os.getenv("TAU2_USER_BASE_URL", "https://api.openai.com/v1"),
     "user_api_key_var": os.getenv("TAU2_USER_API_KEY_VAR", "OPENAI_API_KEY"),
     "task_split": os.getenv("TAU2_TASK_SPLIT", "train"),  # Select between ["train", "test"]
-    "max_steps": int(os.getenv("TAU2_MAX_STEPS", "30")),  # Maximum number of steps per episode
-    "max_errors": int(os.getenv("TAU2_MAX_ERRORS", "10")),  # Maximum number of errors before termination
-    "max_turns": int(os.getenv("TAU2_MAX_TURNS", "30")),  # Maximum number of agent turns
+    "max_turns": int(os.getenv("TAU2_MAX_TURNS", "30")),  # Maximum total turns (user + agent messages)
 }
 
 # Ensure API key is set
@@ -138,8 +136,7 @@ async def generate(args: dict[str, Any], sample: Sample, sampling_params: dict) 
         user_model=TAU2_CONFIGS["user_model"],
         user_base_url=TAU2_CONFIGS["user_base_url"],
         user_api_key_var=TAU2_CONFIGS["user_api_key_var"],
-        max_steps=TAU2_CONFIGS["max_steps"],
-        max_errors=TAU2_CONFIGS["max_errors"],
+        max_turns=TAU2_CONFIGS["max_turns"],
         rollout_args=args,
         sampling_params=sampling_params,
     )
@@ -150,7 +147,7 @@ async def generate(args: dict[str, Any], sample: Sample, sampling_params: dict) 
         task=task,
         rollout_args=args,
         sampling_params=sampling_params,
-        max_num_steps=TAU2_CONFIGS["max_turns"],
+        max_turns=TAU2_CONFIGS["max_turns"],
     )
 
     # Convert to slime Sample format

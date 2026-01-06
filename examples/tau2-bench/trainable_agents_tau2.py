@@ -82,8 +82,13 @@ class TrainableAgentTau2:
         user_api_key_var: str,
         rollout_args: dict[str, Any],
         sampling_params: dict[str, Any],
+        max_turns: int = 30,
     ):
-        """Initialize the trainable agent with τ²-bench's AgentGymEnv"""
+        """Initialize the trainable agent with τ²-bench's AgentGymEnv
+
+        Args:
+            max_turns: Maximum total turns (user + agent messages) in the conversation
+        """
         self.domain = domain
         self.task = task
         self.rollout_args = rollout_args
@@ -91,9 +96,11 @@ class TrainableAgentTau2:
 
         # Create τ²-bench's official Gym environment
         # This handles ALL orchestration internally!
+        # max_steps in AgentGymEnv represents total conversation turns
         self.env = AgentGymEnv(
             domain=domain,
             task_id=task.id,
+            max_steps=max_turns,
             solo_mode=False,  # We want user simulation
             user_llm=user_model,
             user_llm_args={
@@ -218,7 +225,7 @@ class TrainableAgentTau2:
         task: Task,
         rollout_args: dict[str, Any],
         sampling_params: dict[str, Any],
-        max_num_steps: int = 30,
+        max_turns: int = 30,
     ) -> InteractionResult:
         """
         Execute async agent-environment interaction using AgentGymEnv.
@@ -233,7 +240,8 @@ class TrainableAgentTau2:
             task: τ²-bench task to solve
             rollout_args: Rollout configuration arguments
             sampling_params: LLM sampling parameters
-            max_num_steps: Maximum number of agent turns
+            max_turns: Maximum total turns (user + agent messages) in the conversation.
+                      Should match the max_steps passed to AgentGymEnv during initialization.
 
         Returns:
             InteractionResult containing the complete interaction trajectory
@@ -281,7 +289,7 @@ class TrainableAgentTau2:
         )
 
         # Main interaction loop
-        for turn in range(max_num_steps):
+        for turn in range(max_turns):
             # Build current conversation
             conversation_messages = self._observation_to_messages(observation, system_prompt)
 
@@ -378,8 +386,7 @@ def agent_factory_tau2(
     user_model: str = "gpt-4o-mini",
     user_base_url: str = "https://api.openai.com/v1",
     user_api_key_var: str = "OPENAI_API_KEY",
-    max_steps: int = 200,
-    max_errors: int = 10,
+    max_turns: int = 30,
     rollout_args: dict[str, Any] | None = None,
     sampling_params: dict[str, Any] | None = None,
 ):
@@ -392,8 +399,7 @@ def agent_factory_tau2(
         user_model: Model to use for user simulation
         user_base_url: Base URL for user model API
         user_api_key_var: Environment variable for API key
-        max_steps: Maximum steps per episode (passed to gym env)
-        max_errors: Maximum errors before termination (passed to gym env)
+        max_turns: Maximum total turns (user + agent messages) per episode
         rollout_args: Rollout configuration
         sampling_params: LLM sampling parameters
 
@@ -409,12 +415,11 @@ def agent_factory_tau2(
             self.user_model = user_model
             self.user_base_url = user_base_url
             self.user_api_key_var = user_api_key_var
-            self.max_steps = max_steps
-            self.max_errors = max_errors
+            self.max_turns = max_turns
             self.rollout_args = rollout_args or {}
             self.sampling_params = sampling_params or {}
 
-        async def asolve(self, task, rollout_args, sampling_params, max_num_steps=30):
+        async def asolve(self, task, rollout_args, sampling_params, max_turns=30):
             """Create agent for specific task and solve it"""
             agent = TrainableAgentTau2(
                 domain=self.domain,
@@ -424,7 +429,8 @@ def agent_factory_tau2(
                 user_api_key_var=self.user_api_key_var,
                 rollout_args=rollout_args,
                 sampling_params=sampling_params,
+                max_turns=self.max_turns,
             )
-            return await agent.asolve(task, rollout_args, sampling_params, max_num_steps)
+            return await agent.asolve(task, rollout_args, sampling_params, max_turns)
 
     return AgentFactory()
