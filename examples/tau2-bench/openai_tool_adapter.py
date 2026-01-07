@@ -3,8 +3,6 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from tau_bench.agents.tool_calling_agent import RESPOND_ACTION_NAME
-from tau_bench.types import Action
 from sglang.srt.function_call.function_call_parser import FunctionCallParser
 from sglang.srt.managers.io_struct import Function, Tool
 
@@ -58,18 +56,16 @@ class OpenAICompatibleToolCallAdapter:
     and provides OpenAI format output interface.
     """
 
-    def __init__(self, tools_info: list[dict[str, Any]], parser_type: str = "qwen"):
+    def __init__(self, parser_type: str = "qwen"):
         """
         Initialize adapter
 
         Args:
-            tools_info: List of tool information
             parser_type: Parser type, defaults to "qwen"
         """
-        self.tools_info = tools_info
         self.parser_type = parser_type
 
-    def parse_response_to_openai_format(self, response: str) -> dict[str, Any]:
+    def parse_response_to_openai_format(self, response: str, tools_schema: list[dict[str, Any]]) -> dict[str, Any]:
         """
         Parse sglang response to OpenAI compatible format
 
@@ -84,7 +80,7 @@ class OpenAICompatibleToolCallAdapter:
         """
         try:
             # Use existing parser to parse tool calls
-            parsed = parse_tools(response, self.tools_info, self.parser_type)
+            parsed = parse_tools(response, tools_schema, self.parser_type)
 
             # Extract parsing results
             normal_text = parsed["normal_text"]
@@ -129,7 +125,7 @@ class OpenAICompatibleToolCallAdapter:
         )
         return result
 
-    def get_openai_tools_format(self) -> list[dict[str, Any]]:
+    def get_openai_tools_format(self, tools_schema: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Get OpenAI format tool definitions
 
@@ -137,7 +133,7 @@ class OpenAICompatibleToolCallAdapter:
             List of OpenAI format tools
         """
         openai_tools = []
-        for tool in self.tools_info:
+        for tool in tools_schema:
             openai_tool = {
                 "type": "function",
                 "function": {
@@ -153,16 +149,15 @@ class OpenAICompatibleToolCallAdapter:
 
 # Usage examples and factory functions
 def create_openai_adapter(
-    tools_info: list[dict[str, Any]], parser_type: str = "qwen"
+    parser_type: str = "qwen"
 ) -> OpenAICompatibleToolCallAdapter:
     """
     Factory function to create OpenAI compatible tool call adapter
 
     Args:
-        tools_info: List of tool information
         parser_type: Parser type
 
     Returns:
         Configured adapter instance
     """
-    return OpenAICompatibleToolCallAdapter(tools_info, parser_type)
+    return OpenAICompatibleToolCallAdapter(parser_type)

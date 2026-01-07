@@ -30,7 +30,7 @@ from transformers import AutoTokenizer
 
 from slime.rollout.sglang_rollout import GenerateState
 from slime.utils.http_utils import post
-from openai_tool_adapter import OpenAICompatibleToolCallAdapter
+from openai_tool_adapter import create_openai_adapter
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -119,13 +119,13 @@ class TrainableAgentTau2:
             },
         )
 
-        self.openai_adapter = OpenAICompatibleToolCallAdapter(tools_info=[tool.openai_schema for tool in task.tools])
+        self.openai_adapter = create_openai_adapter(parser_type="qwen")
 
     async def _call_llm(self, url: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Make an LLM call to sglang server"""
         return await post(url, payload)
 
-    def _parse_tool(self, response: str) -> dict[str, Any]:
+    def _parse_tool(self, response: str, tools_schema: list[dict[str, Any]]) -> dict[str, Any]:
         """
         Parse tool calls from LLM response string.
 
@@ -141,7 +141,8 @@ class TrainableAgentTau2:
 
         response = response.strip()
 
-        return self.openai_adapter.parse_response_to_openai_format(response)
+        openai_result = self.openai_adapter.parse_response_to_openai_format(response, tools_schema)
+        return openai_result
 
     def _get_token_delta(
         self,
@@ -426,7 +427,7 @@ class TrainableAgentTau2:
                     return self._build_final_result(res, total_reward, info, messages, loss_masks, prompt_token_ids, response_token_ids)
 
                 response = output["text"]
-                openai_result = self._parse_tool(response)
+                openai_result = self._parse_tool(response, tools_schema)
                 if not openai_result["success"]:
                     logger.warning(f"OpenAI adapter failed: {openai_result['error']}")
                     logger.warning(
