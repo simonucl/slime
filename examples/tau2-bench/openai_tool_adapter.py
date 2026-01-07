@@ -3,13 +3,34 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from sglang_tool_parser import parse_tools
 from tau_bench.agents.tool_calling_agent import RESPOND_ACTION_NAME
 from tau_bench.types import Action
+from sglang.srt.function_call.function_call_parser import FunctionCallParser
+from sglang.srt.managers.io_struct import Function, Tool
 
-# Set up logger for this module
+def parse_tools(response: str, tools: list[dict[str, Any]], parser: str = "qwen"):
+    """
+    Parse tools from response
+    """
+    tools_list = [
+        Tool(
+            function=Function(
+                name=tool["function"]["name"],
+                description=tool["function"]["description"],
+                parameters=tool["function"]["parameters"],
+            ),
+            type=tool["type"],
+        )
+        for tool in tools
+    ]
+    parser = FunctionCallParser(tools=tools_list, tool_call_parser=parser)
+    normal_text, calls = parser.parse_non_stream(response)
+    return {
+        "normal_text": normal_text,
+        "calls": [call.model_dump() for call in calls],
+    }
+
 logger = logging.getLogger(__name__)
-
 
 @dataclass
 class OpenAIToolCall:
@@ -37,13 +58,13 @@ class OpenAICompatibleToolCallAdapter:
     and provides OpenAI format output interface.
     """
 
-    def __init__(self, tools_info: list[dict[str, Any]], parser_type: str = "qwen25"):
+    def __init__(self, tools_info: list[dict[str, Any]], parser_type: str = "qwen"):
         """
         Initialize adapter
 
         Args:
             tools_info: List of tool information
-            parser_type: Parser type, defaults to "qwen25"
+            parser_type: Parser type, defaults to "qwen"
         """
         self.tools_info = tools_info
         self.parser_type = parser_type
@@ -108,34 +129,6 @@ class OpenAICompatibleToolCallAdapter:
         )
         return result
 
-    def _call_to_action_sglang(self, calls: list[Any], text_response: str) -> Action:
-        """
-        Convert sglang tool calls to Action object
-
-        This method replicates the original call_to_action_sglang logic,
-        ensuring compatibility with existing code.
-        """
-        # Default action if no action found
-        action = Action(name=RESPOND_ACTION_NAME, kwargs={"content": text_response})
-
-        if calls:
-            if len(calls) > 1:
-                logger.debug("Multiple tool calls identified, only taking first.")
-
-            tool_call = calls[0]
-
-            try:
-                params = json.loads(tool_call["parameters"])
-
-                if not isinstance(params, dict):
-                    logger.warning(f"{params} does not follow dict structure for action")
-                else:
-                    action = Action(name=tool_call["name"], kwargs=params)
-            except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse parameters as JSON: {e}")
-
-        return action
-
     def get_openai_tools_format(self) -> list[dict[str, Any]]:
         """
         Get OpenAI format tool definitions
@@ -160,7 +153,7 @@ class OpenAICompatibleToolCallAdapter:
 
 # Usage examples and factory functions
 def create_openai_adapter(
-    tools_info: list[dict[str, Any]], parser_type: str = "qwen25"
+    tools_info: list[dict[str, Any]], parser_type: str = "qwen"
 ) -> OpenAICompatibleToolCallAdapter:
     """
     Factory function to create OpenAI compatible tool call adapter
