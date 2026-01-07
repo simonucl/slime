@@ -14,6 +14,7 @@ Key components:
 - Proper token tracking for RL training
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -125,6 +126,24 @@ class TrainableAgentTau2:
     async def _call_llm(self, url: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Make an LLM call to sglang server"""
         return await post(url, payload)
+
+    async def _execute_tool(self, env: AgentGymEnv, action: str) -> tuple[str, float, bool, bool, dict]:
+        """
+        Execute environment step asynchronously.
+
+        Wraps the synchronous env.step() call to run in a thread pool,
+        preventing blocking of the async event loop when the environment
+        calls the user simulator (which makes blocking API calls).
+
+        Args:
+            env: The AgentGymEnv instance
+            action: The action to execute (JSON string for tools, text for messages)
+
+        Returns:
+            Tuple of (observation, reward, terminated, truncated, info)
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, env.step, action)
 
     def _parse_tool(self, response: str, tools_schema: list[dict[str, Any]]) -> dict[str, Any]:
         """
@@ -455,8 +474,14 @@ class TrainableAgentTau2:
                 agent_content, function_calls = parsed["normal_text"], parsed["calls"]
                 logger.debug(f"Creating action from - content: '{agent_content}', " f"calls: {function_calls}")
                 if function_calls:
-                    # Convert tool call dict to JSON string for env.step()
-                    tool_call_dict = function_calls[0]
+                    # Convert tool call to tau2-bench format
+                    # SGLang returns "parameters" but tau2 expects "arguments"
+                    sglang_call = function_calls[0]
+                    tool_call_dict = {
+                        "name": sglang_call["name"],
+                        "arguments": sglang_call.get("parameters", sglang_call.get("arguments", {})),
+                        "id": sglang_call.get("id", str(uuid.uuid4())),
+                    }
                     action, tool_called = json.dumps(tool_call_dict), True
                 else:
                     tool_call_dict = None
@@ -469,7 +494,7 @@ class TrainableAgentTau2:
 
             # Step environment with the action
             try:
-                obs, reward, terminated, truncated, env_info = self.env.step(action)
+                obs, reward, terminated, truncated, env_info = await self._execute_tool(self.env, action)
                 total_reward = reward  # Keep latest reward
 
                 if tool_called:
@@ -488,7 +513,8 @@ class TrainableAgentTau2:
                 info = {**info, **env_info}  # env_info is already a dict
 
             except Exception as e:
-                logger.error(f"Environment step failed: {e}")
+                logger.warning("Environment step failed, this is usually related to the User simulation call.")
+                logger.warning(f"Error: {e}")
                 res.status = Status.ABORTED
                 return self._build_final_result(res, total_reward, info, messages, loss_masks, prompt_token_ids, response_token_ids)
 
