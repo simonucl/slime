@@ -34,6 +34,7 @@ from openai_tool_adapter import create_openai_adapter
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 TOOL_INSTRUCTION = (
     " At each turn, you are allowed to call one or no function to assist "
@@ -333,7 +334,7 @@ class TrainableAgentTau2:
         res.messages = messages
         res.loss_mask = loss_masks
         res.tokens = prompt_token_ids + response_token_ids
-        res.response = "".join([msg['content'] for msg in messages if msg["role"] == "assistant"])
+        res.response = "".join([msg.get('content', '') for msg in messages if msg.get("role") == "assistant" and msg.get('content')])
         res.response_length = len(loss_masks)
 
         logger.debug(
@@ -392,7 +393,6 @@ class TrainableAgentTau2:
         # Initialize token tracking lists (token-in-token-out)
         response_token_ids = []
         loss_masks = []
-        assistant_responses = []  # Track assistant text responses
 
         # Get initial observation and build initial messages
         observation = self.env._agent.observation
@@ -455,8 +455,11 @@ class TrainableAgentTau2:
                 agent_content, function_calls = parsed["normal_text"], parsed["calls"]
                 logger.debug(f"Creating action from - content: '{agent_content}', " f"calls: {function_calls}")
                 if function_calls:
-                    action, tool_called = function_calls[0], True
+                    # Convert tool call dict to JSON string for env.step()
+                    tool_call_dict = function_calls[0]
+                    action, tool_called = json.dumps(tool_call_dict), True
                 else:
+                    tool_call_dict = None
                     action, tool_called = agent_content, False
 
             except Exception as e:
@@ -471,7 +474,9 @@ class TrainableAgentTau2:
 
                 if tool_called:
                     messages.append({
-                        "role": "tool", "name": action["name"], "content": obs,
+                        "role": "tool",
+                        "tool_call_id": tool_call_dict.get("id", str(uuid.uuid4())),
+                        "content": obs,
                     })
                 else:
                     messages.append(
@@ -480,7 +485,7 @@ class TrainableAgentTau2:
                 env_token_ids, env_loss_mask = self._get_token_delta(state.tokenizer, messages, tools_schema)
                 response_token_ids.extend(env_token_ids)
                 loss_masks.extend(env_loss_mask)
-                info = {**info, **env_info.model_dump()}
+                info = {**info, **env_info}  # env_info is already a dict
 
             except Exception as e:
                 logger.error(f"Environment step failed: {e}")
@@ -498,16 +503,18 @@ class TrainableAgentTau2:
 
         # Store number of agent turns for metrics
         num_turns = turn + 1 if terminated or truncated else turn
+        info["turns"] = num_turns
+        info["terminated"] = terminated
+        info["truncated"] = truncated
 
         res = self._build_final_result(
-            res, 
-            total_reward, 
-            info, 
-            messages, 
-            loss_masks, 
-            prompt_token_ids, 
+            res,
+            total_reward,
+            info,
+            messages,
+            loss_masks,
+            prompt_token_ids,
             response_token_ids,
-            num_turns,
         )
 
         return res
