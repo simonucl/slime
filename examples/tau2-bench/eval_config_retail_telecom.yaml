@@ -12,6 +12,8 @@ eval:
     - name: retail-test-deepseek-v3.2
       path: ${oc.env:DATA_DIR}/retail_test_tasks.jsonl@[0:5]
       metadata_overrides:
+        domain: retail
+        task_split: test
         user_model: openrouter/deepseek/deepseek-v3.2
         user_base_url: https://openrouter.ai/api/v1
         user_api_key_var: OPENROUTER_API_KEY
@@ -19,6 +21,8 @@ eval:
     - name: telecom-test-deepseek-v3.2
       path: ${oc.env:DATA_DIR}/telecom_test_tasks.jsonl@[0:5]
       metadata_overrides:
+        domain: telecom
+        task_split: test
         user_model: openrouter/deepseek/deepseek-v3.2
         user_base_url: https://openrouter.ai/api/v1
         user_api_key_var: OPENROUTER_API_KEY
@@ -26,6 +30,8 @@ eval:
     - name: telecom-test-gemini-2.5-flash-lite-preview-09-2025
       path: ${oc.env:DATA_DIR}/telecom_test_tasks.jsonl@[0:5]
       metadata_overrides:
+        domain: telecom
+        task_split: test
         user_model: openrouter/google/gemini-2.5-flash-lite-preview-09-2025
         user_base_url: https://openrouter.ai/api/v1
         user_api_key_var: OPENROUTER_API_KEY
@@ -33,14 +39,18 @@ eval:
     - name: telecom-test-gpt-oss-120b
       path: ${oc.env:DATA_DIR}/telecom_test_tasks.jsonl@[0:5]
       metadata_overrides:
+        domain: telecom
+        task_split: test
         user_model: openrouter/openai/gpt-oss-120b
         user_base_url: https://openrouter.ai/api/v1
         user_api_key_var: OPENROUTER_API_KEY
-        
+
     # Retail test with gemini-2.5-flash-lite-preview via OpenRouter
     - name: retail-test-gemini-2.5-flash-lite-preview-09-2025
       path: ${oc.env:DATA_DIR}/retail_test_tasks.jsonl@[0:5]
       metadata_overrides:
+        domain: retail
+        task_split: test
         user_model: openrouter/google/gemini-2.5-flash-lite-preview-09-2025
         user_base_url: https://openrouter.ai/api/v1
         user_api_key_var: OPENROUTER_API_KEY
@@ -49,6 +59,8 @@ eval:
     - name: retail-test-gpt-oss-120b
       path: ${oc.env:DATA_DIR}/retail_test_tasks.jsonl@[0:5]
       metadata_overrides:
+        domain: retail
+        task_split: test
         user_model: openrouter/openai/gpt-oss-120b
         user_base_url: https://openrouter.ai/api/v1
         user_api_key_var: OPENROUTER_API_KEY

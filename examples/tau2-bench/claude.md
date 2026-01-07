@@ -105,6 +105,7 @@ bash examples/tau2-bench/run_qwen3_4B.sh
 
 ### Multi-Model Evaluation with Pass@k
 **Date:** 2026-01-06
+**Updated:** 2026-01-07 - Fixed multi-domain evaluation
 
 Implemented multiple user simulator models for evaluation with configurable eval size and pass@k metrics.
 
@@ -115,9 +116,11 @@ Implemented multiple user simulator models for evaluation with configurable eval
 
 **Configuration:**
 - 3 eval models: deepseek-v3.2, gemini-2.5-flash-lite, gpt-oss-120b
-- Eval size: 10 tasks per model (configurable via path slicing `@[0:10]`)
+- Eval size: 5 tasks per model (configurable via path slicing `@[0:5]`)
 - Pass@k: k=4 with diverse sampling (temperature=1.0, top_p=0.95)
 - Separate WandB metrics per model
+
+**Important:** When using multi-domain training with `TAU2_DOMAIN=multi_domain`, evaluation datasets MUST include `domain` and `task_split` in their `metadata_overrides`. This ensures `get_tasks()` receives valid domain names ("retail", "telecom") instead of "multi_domain" which doesn't exist in τ²-bench's registry.
 
 ### Multi-Domain Training
 **Date:** 2026-01-06
