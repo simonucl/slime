@@ -140,9 +140,9 @@ async def generate(args: dict[str, Any], sample: Sample, sampling_params: dict, 
         max_turns = sample.metadata.get("max_turns", TAU2_CONFIGS["max_turns"])
     else:
         # Use global config when no metadata is available
-        # Check if user model rotation is enabled
+        # Check if user model rotation is enabled (only for training, not evaluation)
         rotation_models = TAU2_CONFIGS.get("user_model_rotation")
-        if rotation_models and len(rotation_models) > 1:
+        if rotation_models and len(rotation_models) > 1 and not evaluation:
             # Use sample.index to determine which model to use
             # Each group of n_samples_per_prompt cycles through the models
             model_idx = sample.index % len(rotation_models)
@@ -151,7 +151,7 @@ async def generate(args: dict[str, Any], sample: Sample, sampling_params: dict, 
             # Log for debugging
             logger.info(f"Sample {sample.index}: Using user_model={user_model} (rotation index {model_idx})")
         else:
-            # Default single model behavior
+            # Default single model behavior (or evaluation mode)
             user_model = TAU2_CONFIGS["user_model"]
 
         # Use global config for other settings

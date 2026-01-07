@@ -79,6 +79,7 @@ python -m tinker_cookbook.recipes.tau2.train \
 **Key Features:**
 - Configure via environment variable: `TAU2_USER_MODEL_ROTATION`
 - Round-robin distribution across samples using `sample.index % len(models)`
+- **Training only** - Evaluation uses `metadata_overrides` from eval_config.yaml
 - ~20 lines of code
 - Backward compatible
 
