@@ -4,40 +4,64 @@ This file tracks implementation plans, design decisions, and documentation creat
 
 ## Plan Documents
 
-### Tinker Backend Adaptation with Shared Core Module
-**Location:** `/Users/simonyu/.claude/plans/goofy-sleeping-bonbon.md`
+### Tinker Backend Adaptation - Standalone Implementation
+**Location:** `/Users/simonyu/.claude/plans/replicated-sleeping-river.md`
 
-**Status:** Planning phase (not yet implemented)
+**Status:** ✅ Implemented (2026-01-06)
 
-**Summary:** Design plan for adding Tinker backend support for tau2-bench training while maintaining seamless checkpoint compatibility with existing Slime backend. Uses a **backend-agnostic core module** approach where both backends share the same tau2-bench logic.
+**Summary:** Standalone Tinker backend implementation for tau2-bench training that is completely self-contained in `tinker-cookbook/recipes/tau2/`. Does NOT modify any existing Slime code, allowing both backends to coexist independently.
 
 **Architecture:**
-- **Shared Core** (`tau2_core.py`): Backend-agnostic module containing:
-  - `Tau2TaskManager` - Task loading and state management
-  - `Tau2Metrics` - Metrics collection (rewards, turns, status)
-  - `Tau2EpisodeExecutor` - Episode execution logic
-- **Slime Adapter** (`generate_with_tau2.py`): Uses shared core + handles sglang inference + Sample format conversion
-- **Tinker Adapter** (`tinker-cookbook/.../tau2/tau2_env.py`): Uses shared core + implements Tinker Env interface + StepResult format
+- **Standalone Tinker Implementation** (`tinker-cookbook/tinker_cookbook/recipes/tau2/`):
+  - `Tau2Env` - Multi-turn environment following twenty_questions pattern
+  - `Tau2EnvGroupBuilder` - Environment group builder
+  - `Tau2Dataset` - Fixed user simulator dataset
+  - `Tau2RotatingDataset` - User simulator rotation support
+  - `Tau2DatasetBuilder` - Dataset loading with chz config
+  - `Tau2TrainConfig` - GRPO training configuration
+- **Slime Implementation** (`examples/tau2-bench/`): Remains completely untouched
 
-**Key Benefits:**
-1. **Single Source of Truth**: Core logic defined once, used by both backends
-2. **Consistent Behavior**: Identical episode execution ensures checkpoint compatibility
-3. **Easy Maintenance**: Bug fixes in core benefit both backends
-4. **Seamless Switching**: Train with Slime, continue with Tinker (or vice versa)
+**Key Features:**
+1. **Complete Independence**: No shared code between backends
+2. **User Simulator Rotation**: Train with multiple user models (gpt-4o-mini, deepseek-v3.2, gemini-2.5-flash)
+3. **Lazy Initialization**: AgentGymEnv created in initial_observation() for per-task config
+4. **Multi-turn Pattern**: Each step() = one conversation turn with state tracked in self.turns
+5. **Multi-Domain Support**: Train on retail+telecom or other domain combinations
 
-**Implementation Branch:** `tinker-adaptation`
+**Files Created:**
+- `tinker-cookbook/tinker_cookbook/recipes/tau2/tau2_env.py` (~470 lines)
+- `tinker-cookbook/tinker_cookbook/recipes/tau2/train.py` (~185 lines)
+- `tinker-cookbook/tinker_cookbook/recipes/tau2/__init__.py` (~20 lines)
 
-**Files to Create:**
-- `examples/tau2-bench/tau2_core.py` - Shared core module
-- `tinker-cookbook/tinker_cookbook/recipes/tau2/tau2_env.py` - Tinker adapter
-- `tinker-cookbook/tinker_cookbook/recipes/tau2/train.py` - Tinker training entry point
+**Files Updated:**
+- `examples/tau2-bench/README.md` - Added Tinker Backend Support section
 
-**Files to Modify:**
-- `examples/tau2-bench/generate_with_tau2.py` - Refactor to use `tau2_core`
-- `examples/tau2-bench/README.md` - Add dual-backend documentation
+**Files NOT Modified (Slime code untouched):**
+- `examples/tau2-bench/trainable_agents_tau2.py`
+- `examples/tau2-bench/generate_with_tau2.py`
 
-**Files to Deprecate:**
-- `examples/tau2-bench/trainable_agents_tau2.py` - Logic moves to `tau2_core.py`
+**Usage:**
+```bash
+# Single user simulator
+python -m tinker_cookbook.recipes.tau2.train
+
+# Multi-user simulator rotation
+python -m tinker_cookbook.recipes.tau2.train \
+    --train_user_models gpt-4o-mini \
+                       openrouter/deepseek/deepseek-v3.2 \
+                       openrouter/google/gemini-2.5-flash-lite-preview-09-2025
+```
+
+**Date:** 2026-01-06
+
+---
+
+### Tinker Backend Adaptation with Shared Core Module (Superseded)
+**Location:** `/Users/simonyu/.claude/plans/goofy-sleeping-bonbon.md`
+
+**Status:** Superseded by standalone implementation
+
+**Summary:** Original design plan for shared core module approach. Replaced by standalone implementation per user request to avoid modifying Slime code.
 
 **Date:** 2026-01-06
 

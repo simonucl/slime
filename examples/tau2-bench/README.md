@@ -360,6 +360,116 @@ self.openai_adapter = create_openai_adapter(tools_info=..., parser_type="qwen25"
 - [slime Documentation](https://github.com/THUDM/slime)
 - [Verifiers Implementation](https://github.com/normal-computing/verifiers)
 
+## Tinker Backend Support
+
+In addition to the Slime backend documented above, τ²-bench also supports training with [Tinker](https://github.com/anthropics/tinker), Anthropic's RL training framework. The Tinker implementation is completely standalone and self-contained in [`tinker-cookbook/recipes/tau2/`](../../tinker-cookbook/tinker_cookbook/recipes/tau2/).
+
+### Architecture
+
+The Tinker implementation follows the twenty_questions multi-turn pattern:
+- Each `step()` = one agent action + one user/env response
+- Conversation state tracked in `self.turns`
+- Uses τ²-bench's `AgentGymEnv` for orchestration
+- Lazy initialization supports per-task user simulator configuration
+
+### Installation
+
+```bash
+# Install Tinker (if not already installed)
+cd tinker-cookbook
+pip install -e .
+
+# τ²-bench should already be installed from above
+```
+
+### Basic Training with Tinker
+
+```bash
+cd tinker-cookbook
+
+# Single user simulator (default: gpt-4o-mini)
+python -m tinker_cookbook.recipes.tau2.train
+
+# Multi-user simulator rotation
+python -m tinker_cookbook.recipes.tau2.train \
+    --train_user_models gpt-4o-mini \
+                       openrouter/deepseek/deepseek-v3.2 \
+                       openrouter/google/gemini-2.5-flash-lite-preview-09-2025 \
+    --train_user_base_urls https://api.openai.com/v1 \
+                          https://openrouter.ai/api/v1 \
+                          https://openrouter.ai/api/v1 \
+    --train_user_api_key_vars OPENAI_API_KEY \
+                              OPENROUTER_API_KEY \
+                              OPENROUTER_API_KEY
+```
+
+### Key Features
+
+**User Simulator Rotation**: Train with multiple user models to improve robustness
+```python
+from tinker_cookbook.recipes.tau2 import Tau2DatasetBuilder
+
+dataset_builder = Tau2DatasetBuilder(
+    domain="retail",
+    # Rotate between 3 user simulators during training
+    train_user_models=[
+        "gpt-4o-mini",
+        "openrouter/deepseek/deepseek-v3.2",
+        "openrouter/google/gemini-2.5-flash-lite-preview-09-2025"
+    ],
+    train_user_base_urls=[
+        "https://api.openai.com/v1",
+        "https://openrouter.ai/api/v1",
+        "https://openrouter.ai/api/v1"
+    ],
+    # Evaluate on deepseek
+    eval_user_model="openrouter/deepseek/deepseek-v3.2",
+    eval_user_base_url="https://openrouter.ai/api/v1",
+)
+```
+
+**Multi-Domain Training**: Train on multiple domains simultaneously
+```python
+# First prepare multi-domain dataset
+cd examples/tau2-bench
+python prepare_tau2_data.py --multi-domain-train retail telecom
+
+# Then train with Tinker
+cd ../../tinker-cookbook
+python -m tinker_cookbook.recipes.tau2.train \
+    --domain retail_telecom \
+    --data_dir ../examples/tau2-bench/data
+```
+
+### Tinker Implementation Details
+
+**File structure:**
+- [`tau2_env.py`](../../tinker-cookbook/tinker_cookbook/recipes/tau2/tau2_env.py) - Environment implementation (~400 lines)
+  - `Tau2Env` - Main environment with multi-turn state tracking
+  - `Tau2DatasetBuilder` - Dataset loading with user simulator rotation
+  - `Tau2RotatingDataset` - Dataset with automatic user model rotation
+- [`train.py`](../../tinker-cookbook/tinker_cookbook/recipes/tau2/train.py) - Training entry point (~150 lines)
+  - `Tau2TrainConfig` - GRPO training configuration
+  - Example configs for single/multi-user simulator setups
+
+**Design philosophy:**
+- **Standalone**: No modifications to Slime code
+- **Self-contained**: All Tinker code in `tinker-cookbook/recipes/tau2/`
+- **Pattern-following**: Matches Tinker's twenty_questions example
+- **Minimal dependencies**: Only τ²-bench and Tinker framework
+
+### Slime vs Tinker
+
+| Aspect | Slime Backend | Tinker Backend |
+|--------|---------------|----------------|
+| **Location** | `examples/tau2-bench/` | `tinker-cookbook/recipes/tau2/` |
+| **Architecture** | Token-in-token-out tracking | Multi-turn Env pattern |
+| **Training** | GRPO via slime.train | GRPO via Tinker's grpo_train |
+| **User Simulator** | Single or rotation via metadata | Built-in rotation support |
+| **State** | Not shared | Not shared (independent) |
+
+Both backends are completely independent - use whichever fits your workflow better!
+
 ## Citation
 
 If you use this integration in your research, please cite:

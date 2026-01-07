@@ -54,6 +54,7 @@ export TAU2_MAX_TURNS=${TAU2_MAX_TURNS:-30}     # Max total turns (user + agent 
 
 # Checkpoint naming
 CHECKPOINT_SUFFIX=${CHECKPOINT_SUFFIX:-"slime"}
+EVAL_CONFIG=${EVAL_CONFIG:-"eval_config.yaml"}
 
 echo "τ²-bench Configuration:"
 echo "  Domain: $TAU2_DOMAIN"
@@ -73,7 +74,7 @@ CKPT_ARGS=(
 
 ROLLOUT_ARGS=(
    # τ²-bench uses task indices as prompts, created by prepare_tau2_data.py
-   --prompt-data ${DATA_DIR}/retail_train_tasks.jsonl
+   --prompt-data ${DATA_DIR}/${TAU2_DOMAIN}_train_tasks.jsonl
    --input-key index
    --rollout-shuffle
    --num-rollout 500
@@ -88,7 +89,7 @@ ROLLOUT_ARGS=(
 
 EVAL_ARGS=(
    --eval-interval 5
-   --eval-config ${SCRIPT_DIR}/eval_config.yaml
+   --eval-config ${SCRIPT_DIR}/${EVAL_CONFIG}
    --log-passrate
 )
 

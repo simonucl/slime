@@ -1,0 +1,54 @@
+eval:
+  defaults:
+    # Pass@k sampling parameters for diversity
+    temperature: 1.0
+    top_p: 0.95
+    top_k: -1
+    max_response_len: 8192
+    n_samples_per_eval_prompt: 4  # k=4 for pass@k
+
+  datasets:
+    # Retail test with deepseek-v3.2 via OpenRouter
+    - name: retail-test-deepseek-v3.2
+      path: ${oc.env:DATA_DIR}/retail_test_tasks.jsonl@[0:5]
+      metadata_overrides:
+        user_model: openrouter/deepseek/deepseek-v3.2
+        user_base_url: https://openrouter.ai/api/v1
+        user_api_key_var: OPENROUTER_API_KEY
+
+    - name: telecom-test-deepseek-v3.2
+      path: ${oc.env:DATA_DIR}/telecom_test_tasks.jsonl@[0:5]
+      metadata_overrides:
+        user_model: openrouter/deepseek/deepseek-v3.2
+        user_base_url: https://openrouter.ai/api/v1
+        user_api_key_var: OPENROUTER_API_KEY
+
+    - name: telecom-test-gemini-2.5-flash-lite-preview-09-2025
+      path: ${oc.env:DATA_DIR}/telecom_test_tasks.jsonl@[0:5]
+      metadata_overrides:
+        user_model: openrouter/google/gemini-2.5-flash-lite-preview-09-2025
+        user_base_url: https://openrouter.ai/api/v1
+        user_api_key_var: OPENROUTER_API_KEY
+
+    - name: telecom-test-gpt-oss-120b
+      path: ${oc.env:DATA_DIR}/telecom_test_tasks.jsonl@[0:5]
+      metadata_overrides:
+        user_model: openrouter/openai/gpt-oss-120b
+        user_base_url: https://openrouter.ai/api/v1
+        user_api_key_var: OPENROUTER_API_KEY
+        
+    # Retail test with gemini-2.5-flash-lite-preview via OpenRouter
+    - name: retail-test-gemini-2.5-flash-lite-preview-09-2025
+      path: ${oc.env:DATA_DIR}/retail_test_tasks.jsonl@[0:5]
+      metadata_overrides:
+        user_model: openrouter/google/gemini-2.5-flash-lite-preview-09-2025
+        user_base_url: https://openrouter.ai/api/v1
+        user_api_key_var: OPENROUTER_API_KEY
+
+    # Retail test with gpt-oss-120b via OpenRouter
+    - name: retail-test-gpt-oss-120b
+      path: ${oc.env:DATA_DIR}/retail_test_tasks.jsonl@[0:5]
+      metadata_overrides:
+        user_model: openrouter/openai/gpt-oss-120b
+        user_base_url: https://openrouter.ai/api/v1
+        user_api_key_var: OPENROUTER_API_KEY
