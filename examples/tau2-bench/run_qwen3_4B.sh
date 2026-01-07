@@ -49,6 +49,11 @@ export TAU2_USER_MODEL=${TAU2_USER_MODEL:-"gpt-4o-mini"}
 export TAU2_USER_BASE_URL=${TAU2_USER_BASE_URL:-"https://api.openai.com/v1"}
 export TAU2_USER_API_KEY_VAR=${TAU2_USER_API_KEY_VAR:-"OPENAI_API_KEY"}
 
+# User model rotation (optional) - uncomment to enable rotation across multiple user simulators
+# Rotates through models in round-robin fashion across n-samples-per-prompt
+# Example with 3 models (requires OPENROUTER_API_KEY to be set):
+# export TAU2_USER_MODEL_ROTATION="openrouter/deepseek/deepseek-v3.2,openrouter/google/gemini-2.5-flash-lite-preview-09-2025,openrouter/openai/gpt-oss-120b"
+
 # Episode configuration
 export TAU2_MAX_TURNS=${TAU2_MAX_TURNS:-30}     # Max total turns (user + agent messages) per episode
 

@@ -70,23 +70,33 @@ python -m tinker_cookbook.recipes.tau2.train \
 ### Variable User Simulators within n-samples-per-prompt
 **Location:** `/Users/simonyu/.claude/plans/noble-napping-creek.md`
 
-**Status:** Planning phase (not yet implemented)
+**Status:** ✅ Implemented (2026-01-07)
 
-**Summary:** Design plan for enabling different user simulator models to be rotated across N samples generated from each prompt during training. This allows training against diverse user behaviors (e.g., deepseek, gemini, gpt-oss) within the same rollout group.
+**Summary:** Enables different user simulator models to be rotated across N samples generated from each prompt during training. This allows training against diverse user behaviors (e.g., deepseek, gemini, gpt-oss) within the same rollout group.
 
 **Approach:** Option 2 (Dynamic Selection in Generate Function) - Most lightweight solution with zero core slime modifications. All changes confined to `examples/tau2-bench/generate_with_tau2.py`.
 
 **Key Features:**
 - Configure via environment variable: `TAU2_USER_MODEL_ROTATION`
 - Round-robin distribution across samples using `sample.index % len(models)`
-- ~20 lines of code, ~30 minutes implementation time
+- ~20 lines of code
 - Backward compatible
 
-**Files to modify:**
-- `examples/tau2-bench/generate_with_tau2.py` - Add rotation config and model selection logic
-- `examples/tau2-bench/run_qwen3_4B.sh` - Add environment variable example (commented)
+**Files modified:**
+- `examples/tau2-bench/generate_with_tau2.py` - Added rotation config and model selection logic
+- `examples/tau2-bench/run_qwen3_4B.sh` - Added environment variable example (commented)
 
-**Date:** 2026-01-06
+**Usage:**
+```bash
+# Enable rotation with 3 user models
+export TAU2_USER_MODEL_ROTATION="openrouter/deepseek/deepseek-v3.2,openrouter/google/gemini-2.5-flash-lite-preview-09-2025,openrouter/openai/gpt-oss-120b"
+export OPENROUTER_API_KEY="your-key-here"
+
+# Run training (with n-samples-per-prompt=8, models will be distributed 3,3,2)
+bash examples/tau2-bench/run_qwen3_4B.sh
+```
+
+**Date:** 2026-01-07
 
 ---
 

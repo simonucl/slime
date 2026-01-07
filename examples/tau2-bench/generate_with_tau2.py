@@ -30,6 +30,11 @@ TAU2_CONFIGS = {
     "user_api_key_var": os.getenv("TAU2_USER_API_KEY_VAR", "OPENAI_API_KEY"),
     "task_split": os.getenv("TAU2_TASK_SPLIT", "train"),  # Select between ["train", "test"]
     "max_turns": int(os.getenv("TAU2_MAX_TURNS", "30")),  # Maximum total turns (user + agent messages)
+
+    # User model rotation for multi-model training
+    # Format: comma-separated list of model names (e.g., "model1,model2,model3")
+    # Example: "gpt-4o-mini,openrouter/deepseek/deepseek-v3.2,openrouter/google/gemini-2.5-flash-lite-preview-09-2025"
+    "user_model_rotation": os.getenv("TAU2_USER_MODEL_ROTATION", "").split(",") if os.getenv("TAU2_USER_MODEL_ROTATION") else None,
 }
 
 # Ensure API key is set
@@ -135,7 +140,21 @@ async def generate(args: dict[str, Any], sample: Sample, sampling_params: dict, 
         max_turns = sample.metadata.get("max_turns", TAU2_CONFIGS["max_turns"])
     else:
         # Use global config when no metadata is available
-        user_model = TAU2_CONFIGS["user_model"]
+        # Check if user model rotation is enabled
+        rotation_models = TAU2_CONFIGS.get("user_model_rotation")
+        if rotation_models and len(rotation_models) > 1:
+            # Use sample.index to determine which model to use
+            # Each group of n_samples_per_prompt cycles through the models
+            model_idx = sample.index % len(rotation_models)
+            user_model = rotation_models[model_idx].strip()
+
+            # Log for debugging
+            logger.info(f"Sample {sample.index}: Using user_model={user_model} (rotation index {model_idx})")
+        else:
+            # Default single model behavior
+            user_model = TAU2_CONFIGS["user_model"]
+
+        # Use global config for other settings
         user_base_url = TAU2_CONFIGS["user_base_url"]
         user_api_key_var = TAU2_CONFIGS["user_api_key_var"]
         domain = TAU2_CONFIGS["domain"]
