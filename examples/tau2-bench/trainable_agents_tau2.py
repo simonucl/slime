@@ -35,7 +35,6 @@ from openai_tool_adapter import create_openai_adapter
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 TOOL_INSTRUCTION = (
     " At each turn, you are allowed to call one or no function to assist "
@@ -475,24 +474,10 @@ class TrainableAgentTau2:
                 agent_content, function_calls = parsed["normal_text"], parsed["calls"]
                 logger.debug(f"Creating action from - content: '{agent_content}', " f"calls: {function_calls}")
                 if function_calls:
-                    # Convert tool call to tau2-bench format
-                    # SGLang returns "parameters" but tau2 expects "arguments"
                     sglang_call = function_calls[0]
-
-                    # Get arguments - might be dict or JSON string
-                    arguments = sglang_call.get("parameters", sglang_call.get("arguments", {}))
-
-                    # If arguments is a JSON string, parse it to dict
-                    if isinstance(arguments, str):
-                        try:
-                            arguments = json.loads(arguments)
-                        except (json.JSONDecodeError, TypeError):
-                            logger.warning(f"Failed to parse arguments as JSON: {arguments}")
-                            arguments = {}
-
                     tool_call_dict = {
                         "name": sglang_call["name"],
-                        "arguments": arguments,  # Must be dict, not string
+                        "arguments": sglang_call["arguments"],  # Already a dict
                         "id": sglang_call.get("id", str(uuid.uuid4())),
                     }
                     action, tool_called = json.dumps(tool_call_dict), True

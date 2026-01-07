@@ -8,7 +8,9 @@ from sglang.srt.managers.io_struct import Function, Tool
 
 def parse_tools(response: str, tools: list[dict[str, Any]], parser: str = "qwen"):
     """
-    Parse tools from response
+    Parse tools from response and normalize to tau2-bench format.
+
+    Returns calls with 'arguments' field (dict) instead of 'parameters'.
     """
     tools_list = [
         Tool(
@@ -23,9 +25,34 @@ def parse_tools(response: str, tools: list[dict[str, Any]], parser: str = "qwen"
     ]
     parser = FunctionCallParser(tools=tools_list, tool_call_parser=parser)
     normal_text, calls = parser.parse_non_stream(response)
+
+    # Normalize calls: convert 'parameters' to 'arguments' and ensure it's a dict
+    normalized_calls = []
+    for call in calls:
+        call_dict = call.model_dump()
+
+        # Get parameters/arguments (might be dict or JSON string)
+        params = call_dict.get("parameters", call_dict.get("arguments", {}))
+
+        # Ensure it's a dict, not a JSON string
+        if isinstance(params, str):
+            try:
+                params = json.loads(params)
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Failed to parse parameters as JSON: {params}")
+                params = {}
+
+        # Create normalized call with 'arguments' field
+        normalized_call = {
+            "name": call_dict.get("name", ""),
+            "arguments": params,  # tau2-bench expects 'arguments' as dict
+            "id": call_dict.get("id", ""),
+        }
+        normalized_calls.append(normalized_call)
+
     return {
         "normal_text": normal_text,
-        "calls": [call.model_dump() for call in calls],
+        "calls": normalized_calls,
     }
 
 logger = logging.getLogger(__name__)

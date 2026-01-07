@@ -77,18 +77,18 @@ ROLLOUT_ARGS=(
    --input-key index
    --rollout-shuffle
    --num-rollout 500
-   --rollout-batch-size 4
+   --rollout-batch-size 8
    --n-samples-per-prompt 8
    --rollout-max-response-len 8192
    --rollout-temperature 1
-   --global-batch-size 32
+   --global-batch-size 64
    --dynamic-sampling-filter-path slime.rollout.filter_hub.dynamic_sampling_filters.check_reward_nonzero_std
    --balance-data
 )
 
 EVAL_ARGS=(
    --eval-interval 5
-   --eval-config ${SCRIPT_DIR}/eval_config_debug.yaml
+   --eval-config ${SCRIPT_DIR}/eval_config.yaml
    --log-passrate
 )
 
