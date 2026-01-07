@@ -1,0 +1,17 @@
+eval:
+  defaults:
+    # Pass@k sampling parameters for diversity
+    temperature: 1.0
+    top_p: 0.95
+    top_k: -1
+    max_response_len: 8192
+    n_samples_per_eval_prompt: 1  # k=4 for pass@k
+
+  datasets:
+    # Retail test with gemini-2.5-flash-lite-preview via OpenRouter
+    - name: retail-test-gemini-2.5-flash-lite-preview-09-2025
+      path: ${oc.env:DATA_DIR}/retail_test_tasks.jsonl@[0:5]
+      metadata_overrides:
+        user_model: openrouter/google/gemini-2.5-flash-lite-preview-09-2025
+        user_base_url: https://openrouter.ai/api/v1
+        user_api_key_var: OPENROUTER_API_KEY

@@ -394,8 +394,9 @@ class TrainableAgentTau2:
         state = GenerateState(rollout_args)
         url = f"http://{rollout_args.sglang_router_ip}:{rollout_args.sglang_router_port}/generate"
 
-        # Reset environment
-        _, info = self.env.reset()
+        # Reset environment (async to avoid blocking)
+        loop = asyncio.get_event_loop()
+        _, info = await loop.run_in_executor(None, self.env.reset)
 
         # Get tools and policy from info
         tools = info.get("tools", [])
@@ -477,9 +478,21 @@ class TrainableAgentTau2:
                     # Convert tool call to tau2-bench format
                     # SGLang returns "parameters" but tau2 expects "arguments"
                     sglang_call = function_calls[0]
+
+                    # Get arguments - might be dict or JSON string
+                    arguments = sglang_call.get("parameters", sglang_call.get("arguments", {}))
+
+                    # If arguments is a JSON string, parse it to dict
+                    if isinstance(arguments, str):
+                        try:
+                            arguments = json.loads(arguments)
+                        except (json.JSONDecodeError, TypeError):
+                            logger.warning(f"Failed to parse arguments as JSON: {arguments}")
+                            arguments = {}
+
                     tool_call_dict = {
                         "name": sglang_call["name"],
-                        "arguments": sglang_call.get("parameters", sglang_call.get("arguments", {})),
+                        "arguments": arguments,  # Must be dict, not string
                         "id": sglang_call.get("id", str(uuid.uuid4())),
                     }
                     action, tool_called = json.dumps(tool_call_dict), True

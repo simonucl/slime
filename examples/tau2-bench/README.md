@@ -66,7 +66,19 @@ PYTHONPATH=/root/Megatron-LM python tools/convert_hf_to_torch_dist.py \
     --hf-checkpoint /root/Qwen3-4B-Instruct-2507 \
     --save /root/Qwen3-4B-Instruct-2507_torch_dist
 ```
+```bash
+# (Optional) Download SFT-1 (Supervised Fine-Tuned) checkpoint for Qwen3-4B used in Jarrodbarnes/Qwen3-4B-tau2-sft1.
+# This model is recommended for improved robustness in τ²-bench SFT-only and RLHF runs.
 
+huggingface-cli download Jarrodbarnes/Qwen3-4B-tau2-sft1 --local-dir /root/Qwen3-4B-tau2-sft1
+
+cd /root/slime
+source scripts/models/qwen3-4B-Instruct-2507.sh
+PYTHONPATH=/root/Megatron-LM python tools/convert_hf_to_torch_dist.py \
+    ${MODEL_ARGS[@]} \
+    --hf-checkpoint /root/Qwen3-4B-tau2-sft1 \
+    --save /root/Qwen3-4B-tau2-sft1_torch_dist
+```
 ### Prepare the data
 
 ```bash

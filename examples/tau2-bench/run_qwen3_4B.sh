@@ -88,7 +88,7 @@ ROLLOUT_ARGS=(
 
 EVAL_ARGS=(
    --eval-interval 5
-   --eval-config ${SCRIPT_DIR}/eval_config.yaml
+   --eval-config ${SCRIPT_DIR}/eval_config_debug.yaml
    --log-passrate
 )
 
