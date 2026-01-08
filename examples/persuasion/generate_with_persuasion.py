@@ -160,22 +160,44 @@ async def generate(
     Returns:
         Sample with interaction results
     """
-    # Deserialize task from sample.prompt
-    # Format: Full task JSON dict (includes conversation_id, personas, etc.)
+    # Load task using index from sample.prompt
+    # When --input-key index is used, sample.prompt contains the index as a string (e.g. "0", "1", "2")
     try:
-        task_data = json.loads(sample.prompt)
-        task = deserialize_task(task_data)
-    except (json.JSONDecodeError, KeyError, TypeError) as e:
-        logger.error(f"Failed to deserialize task data: {e}")
+        task_index = int(sample.prompt)
+
+        # Get task split from metadata if available (for eval), else use global config
+        if sample.metadata and "task_split" in sample.metadata:
+            task_split = sample.metadata["task_split"]
+        else:
+            task_split = PERSUASION_CONFIGS["task_split"]
+
+        # Load task file
+        task_file = os.path.join(
+            PERSUASION_CONFIGS["corpus_path"],
+            f"{task_split}_tasks.jsonl"
+        )
+
+        # Read task at index
+        with open(task_file, 'r') as f:
+            for i, line in enumerate(f):
+                if i == task_index:
+                    task_data = json.loads(line)
+                    task = deserialize_task(task_data)
+                    break
+            else:
+                raise ValueError(f"Task index {task_index} not found in {task_file}")
+
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError, FileNotFoundError) as e:
+        logger.error(f"Failed to load task: {e}")
         return Sample(
             index=sample.index,
-            prompt=sample.prompt[:100] if len(sample.prompt) > 100 else sample.prompt,
+            prompt=sample.prompt if sample.prompt else f"index:{sample.index}",
             tokens=[],
             response="",
             reward=0.0,
             loss_mask=[],
             status="aborted",
-            metadata={"error": f"Task deserialization failed: {str(e)}"},
+            metadata={"error": f"Task loading failed: {str(e)}"},
             response_length=0
         )
 

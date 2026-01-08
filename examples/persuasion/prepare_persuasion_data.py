@@ -64,10 +64,12 @@ def create_persuasion_tasks(
 
     # Write JSONL with full task data (not just indices)
     with open(output_path, 'w') as f:
-        for task in tasks:
+        for idx, task in enumerate(tasks):
             # Each line contains complete task information including personas
             # This avoids extra loading during training (unlike tau2-bench's index-only approach)
             task_data = serialize_task(task)
+            # Add index field for compatibility with --input-key index
+            task_data["index"] = str(idx)
             f.write(json.dumps(task_data) + "\n")
 
     print(f"Created {output_path} with {len(tasks)} tasks")

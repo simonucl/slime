@@ -19,6 +19,7 @@ eval:
       path: ${oc.env:PERSUASION_CORPUS_PATH}/test_tasks.jsonl
       # metadata_overrides can be added here to override persuadee model
       metadata_overrides:
+        task_split: "test"
         persuadee_model: "openai/gpt-4o-mini"
         persuadee_base_url: "https://openrouter.ai/api/v1"
         persuadee_api_key_var: "OPENROUTER_API_KEY"
