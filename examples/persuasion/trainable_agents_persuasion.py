@@ -40,7 +40,7 @@ class InteractionResult:
     prompt: str  # Conversation ID
     tokens: list[int]  # Full conversation token IDs
     response: str  # Full conversation text
-    reward: float  # Donation amount (0.0-2.0)
+    reward: float  # Reward mapped from donation: [-1.0, 1.0] (donation 0->-1, 1->0, >=2->1)
     loss_mask: list[int]  # Binary mask: 1=persuader (trainable), 0=persuadee (environment)
     status: Status  # COMPLETED, TRUNCATED, ABORTED
     info: dict  # Metadata (turns, personas, etc.)
@@ -257,6 +257,26 @@ You MUST say it in this format, otherwise the donation will not be made.
             return max(0.0, min(2.0, amount))
 
         return None
+
+    @staticmethod
+    def donation_to_reward(donation: float) -> float:
+        """
+        Map donation amount to reward range.
+
+        Args:
+            donation: Donation amount (0.0 to infinity)
+
+        Returns:
+            Reward in range [-1.0, 1.0]
+            - donation = 0 -> reward = -1
+            - donation = 1 -> reward = 0
+            - donation >= 2 -> reward = 1
+        """
+        # Clamp donations >= 2 to 2
+        donation = min(donation, 2.0)
+        # Linear mapping: (0, 2) -> (-1, 1)
+        # Formula: reward = (donation - 1) / 1 = donation - 1
+        return donation - 1.0
 
 
 class TrainableAgentPersuasion:
@@ -520,7 +540,7 @@ class TrainableAgentPersuasion:
             if self.env.donation_amount is not None:
                 # Donation made - episode completed
                 terminated = True
-                total_reward = self.env.donation_amount
+                total_reward = PersuasionEnv.donation_to_reward(self.env.donation_amount)
                 break
 
             if turn + 1 >= max_turns:
@@ -528,13 +548,17 @@ class TrainableAgentPersuasion:
                 truncated = True
                 break
 
-        # Determine final status
+        # Determine final status and reward
         if terminated:
             res.status = Status.COMPLETED
         elif truncated:
             res.status = Status.TRUNCATED
+            # No donation made in truncated episodes - treat as $0 donation
+            total_reward = PersuasionEnv.donation_to_reward(0.0)  # reward = -1.0
         else:
             res.status = Status.ABORTED
+            # Aborted episodes also get $0 donation reward
+            total_reward = PersuasionEnv.donation_to_reward(0.0)  # reward = -1.0
 
         # Build info
         info = {
