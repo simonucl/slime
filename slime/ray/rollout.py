@@ -9,11 +9,7 @@ import numpy as np
 import ray
 import torch
 from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
-from sglang.srt.constants import GPU_MEMORY_TYPE_KV_CACHE, GPU_MEMORY_TYPE_WEIGHTS
-try:
-    from sglang.srt.constants import GPU_MEMORY_TYPE_CUDA_GRAPH
-except ImportError:
-    GPU_MEMORY_TYPE_CUDA_GRAPH = "cuda_graph"
+from sglang.srt.constants import GPU_MEMORY_TYPE_WEIGHTS
 
 from slime.backends.sglang_utils.sglang_engine import SGLangEngine
 from slime.rollout.base_types import call_rollout_fn
