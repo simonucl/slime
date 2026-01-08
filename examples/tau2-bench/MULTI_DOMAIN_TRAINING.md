@@ -175,9 +175,35 @@ eval/telecom-test-deepseek-pass@4
 3. **More Training Data**: Combined dataset is larger than single domain
 4. **Domain Robustness**: Agent handles diverse scenarios
 
+## Troubleshooting
+
+### Error: `KeyError: 'Task Set multi_domain not found in registry'`
+
+**Symptom:** This error occurs during evaluation when using multi-domain training.
+
+**Cause:** The global environment variable `TAU2_DOMAIN=multi_domain` is set, but τ²-bench only recognizes individual domain names ("retail", "telecom", "airline", "mock"). During evaluation, if `metadata_overrides` doesn't include `domain` and `task_split`, the code falls back to the global config and tries to call `get_tasks(task_set_name="multi_domain")`, which fails.
+
+**Solution:** Always include `domain` and `task_split` in `metadata_overrides` for evaluation datasets in `eval_config.yaml`:
+
+```yaml
+eval:
+  datasets:
+    - name: retail-test-deepseek
+      path: ${oc.env:DATA_DIR}/retail_test_tasks.jsonl@[0:5]
+      metadata_overrides:
+        domain: retail          # Required for multi-domain training
+        task_split: test        # Required for multi-domain training
+        user_model: openrouter/deepseek/deepseek-v3.2
+        user_base_url: https://openrouter.ai/api/v1
+        user_api_key_var: OPENROUTER_API_KEY
+```
+
+**Why this works:** When `sample.metadata` contains `domain` and `task_split`, the code at [generate_with_tau2.py:133-140](generate_with_tau2.py#L133-L140) uses these metadata values instead of falling back to `TAU2_CONFIGS["domain"]` (which is "multi_domain").
+
 ## Notes
 
 - The `--balance-data` flag in ROLLOUT_ARGS ensures balanced sampling across domains
 - Metadata is automatically passed through the training pipeline
 - No code changes needed - everything works with existing infrastructure
 - Domain information is preserved in samples for debugging/analysis
+- When using multi-domain training, evaluation datasets MUST specify `domain` and `task_split` in `metadata_overrides`
