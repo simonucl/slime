@@ -6,6 +6,7 @@ and provides task lookup and persona description generation.
 """
 
 import json
+import math
 import os
 from dataclasses import dataclass
 from typing import Optional
@@ -212,6 +213,10 @@ class PersonaManager:
         """
         return self.utterances.get(conversation_id, [])
 
+    def _is_valid_number(self, value) -> bool:
+        """Check if a value is a valid number (not None and not NaN)"""
+        return value is not None and not (isinstance(value, float) and math.isnan(value))
+
     def generate_persona_description(self, attrs: PersonaAttributes) -> str:
         """
         Generate natural language persona description from attributes.
@@ -227,7 +232,7 @@ class PersonaManager:
         lines = []
 
         # Demographics
-        if attrs.age is not None:
+        if self._is_valid_number(attrs.age):
             lines.append(f"Age: {int(attrs.age)}")
         if attrs.sex:
             lines.append(f"Gender: {attrs.sex}")
@@ -235,7 +240,7 @@ class PersonaManager:
             lines.append(f"Race: {attrs.race}")
         if attrs.edu:
             lines.append(f"Education: {attrs.edu}")
-        if attrs.income is not None:
+        if self._is_valid_number(attrs.income):
             income_map = {
                 1.0: "Less than $10,000",
                 2.0: "$10,000 - $24,999",
@@ -258,15 +263,15 @@ class PersonaManager:
 
         # Personality (Big Five) - only include if available
         personality_traits = []
-        if attrs.extrovert is not None:
+        if self._is_valid_number(attrs.extrovert):
             personality_traits.append(f"extraversion: {attrs.extrovert:.1f}/5")
-        if attrs.agreeable is not None:
+        if self._is_valid_number(attrs.agreeable):
             personality_traits.append(f"agreeableness: {attrs.agreeable:.1f}/5")
-        if attrs.conscientious is not None:
+        if self._is_valid_number(attrs.conscientious):
             personality_traits.append(f"conscientiousness: {attrs.conscientious:.1f}/5")
-        if attrs.neurotic is not None:
+        if self._is_valid_number(attrs.neurotic):
             personality_traits.append(f"neuroticism: {attrs.neurotic:.1f}/5")
-        if attrs.open is not None:
+        if self._is_valid_number(attrs.open):
             personality_traits.append(f"openness: {attrs.open:.1f}/5")
 
         if personality_traits:
@@ -274,17 +279,17 @@ class PersonaManager:
 
         # Values (Schwartz) - only include top values
         value_scores = {}
-        if attrs.achievement is not None:
+        if self._is_valid_number(attrs.achievement):
             value_scores['achievement'] = attrs.achievement
-        if attrs.benevolence is not None:
+        if self._is_valid_number(attrs.benevolence):
             value_scores['benevolence'] = attrs.benevolence
-        if attrs.power is not None:
+        if self._is_valid_number(attrs.power):
             value_scores['power'] = attrs.power
-        if attrs.security is not None:
+        if self._is_valid_number(attrs.security):
             value_scores['security'] = attrs.security
-        if attrs.self_direction is not None:
+        if self._is_valid_number(attrs.self_direction):
             value_scores['self-direction'] = attrs.self_direction
-        if attrs.universalism is not None:
+        if self._is_valid_number(attrs.universalism):
             value_scores['universalism'] = attrs.universalism
 
         if value_scores:
@@ -295,20 +300,20 @@ class PersonaManager:
 
         # Moral foundations - only include strong ones (> 3.5)
         moral_foundations = []
-        if attrs.care is not None and attrs.care > 3.5:
+        if self._is_valid_number(attrs.care) and attrs.care > 3.5:
             moral_foundations.append(f"care: {attrs.care:.1f}")
-        if attrs.fairness is not None and attrs.fairness > 3.5:
+        if self._is_valid_number(attrs.fairness) and attrs.fairness > 3.5:
             moral_foundations.append(f"fairness: {attrs.fairness:.1f}")
-        if attrs.loyalty is not None and attrs.loyalty > 3.5:
+        if self._is_valid_number(attrs.loyalty) and attrs.loyalty > 3.5:
             moral_foundations.append(f"loyalty: {attrs.loyalty:.1f}")
-        if attrs.authority is not None and attrs.authority > 3.5:
+        if self._is_valid_number(attrs.authority) and attrs.authority > 3.5:
             moral_foundations.append(f"authority: {attrs.authority:.1f}")
 
         if moral_foundations:
             lines.append(f"Strong moral foundations: {', '.join(moral_foundations)}")
 
         # Decision-making style
-        if attrs.rational is not None and attrs.intuitive is not None:
+        if self._is_valid_number(attrs.rational) and self._is_valid_number(attrs.intuitive):
             if attrs.rational > attrs.intuitive:
                 lines.append(f"Decision-making style: More rational (rational: {attrs.rational:.1f}, intuitive: {attrs.intuitive:.1f})")
             elif attrs.intuitive > attrs.rational:

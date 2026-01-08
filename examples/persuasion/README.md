@@ -173,6 +173,150 @@ Conversations end when:
 2. **TRUNCATED**: Max turns reached (default reward = 0.0)
 3. **ABORTED**: Error occurs (reward = 0.0)
 
+## Standalone Evaluation
+
+In addition to integrated evaluation during training (via `--eval-config`), you can run standalone evaluations to test different persuader × persuadee model combinations.
+
+### Quick Start
+
+```bash
+# Set API keys
+export OPENROUTER_API_KEY="sk-or-..."
+export OPENAI_API_KEY="sk-..."
+
+# Set data directory
+export PERSUASION_DATA_DIR="/path/to/persuasion_data"
+
+# Run evaluation with all model combinations
+bash run_eval_persuasion.sh
+
+# Or run a single evaluation
+python eval_persuasion.py \
+    --persuader-model "openrouter/deepseek/deepseek-chat" \
+    --persuader-base-url "https://openrouter.ai/api/v1" \
+    --persuader-api-key-var "OPENROUTER_API_KEY" \
+    --persuadee-model "openrouter/google/gemini-2.5-flash-lite-preview-09-2025" \
+    --persuadee-base-url "https://openrouter.ai/api/v1" \
+    --persuadee-api-key-var "OPENROUTER_API_KEY" \
+    --corpus-path "data/persuasionforgood_corpus" \
+    --data-path "${PERSUASION_DATA_DIR}/test_tasks.jsonl" \
+    --output-path "results.jsonl" \
+    --max-concurrent 10
+```
+
+### Evaluation Output Format
+
+Each result is saved as a JSON line with the following structure:
+
+```json
+{
+  "example_id": "conversation_001",
+  "prompt": {
+    "conversation_id": "conversation_001",
+    "persuader_persona": {...},
+    "persuadee_persona": {...}
+  },
+  "completion": {
+    "messages": [
+      {"role": "persuader", "content": "...", "turn": 1},
+      {"role": "persuadee", "content": "...", "turn": 1},
+      ...
+    ],
+    "final_donation": 1.5
+  },
+  "reward": 1.5,
+  "error": null,
+  "evaluation_criteria": {
+    "donation_amount": 1.5,
+    "success": true,
+    "turns_used": 8,
+    "completed": true,
+    "ground_truth_donation": 2.0,
+    "donation_difference": -0.5
+  },
+  "metadata": {
+    "persuader_model": "openrouter/deepseek/deepseek-chat",
+    "persuadee_model": "openrouter/google/gemini-2.5-flash-lite-preview-09-2025",
+    "max_turns": 10,
+    "temperature": 1.0,
+    "ground_truth_donation": 2.0
+  }
+}
+```
+
+### Analyzing Results
+
+After running evaluations, analyze the results:
+
+```bash
+# Show comparison table across all model combinations
+python analyze_eval_results.py eval_results/
+
+# Show detailed per-file statistics
+python analyze_eval_results.py eval_results/ --detailed
+```
+
+Example output:
+
+```
+Loaded 6 result files
+
+================================================================================
+Model Comparison
+================================================================================
+
+Persuader                                Persuadee                                Avg $    Success%  Avg Turns
+--------------------------------------------------------------------------------------------------------------
+deepseek-chat                            gemini-2.5-flash-lite-preview-09-2025    $1.67    73.4%      7.2
+deepseek-chat                            gpt-4o-mini                              $1.52    68.9%      7.5
+gemini-2.5-flash-lite-preview-09-2025    gemini-2.5-flash-lite-preview-09-2025    $1.45    65.1%      8.1
+gemini-2.5-flash-lite-preview-09-2025    gpt-4o-mini                              $1.38    62.7%      8.3
+gpt-4o-mini                              gemini-2.5-flash-lite-preview-09-2025    $1.23    58.9%      8.7
+gpt-4o-mini                              gpt-4o-mini                              $1.15    55.2%      9.0
+```
+
+### Customizing Model Combinations
+
+Edit `run_eval_persuasion.sh` to change which models are evaluated:
+
+```bash
+# Persuader models (policies to evaluate)
+PERSUADER_MODELS=(
+    "openrouter/deepseek/deepseek-chat"
+    "openrouter/google/gemini-2.5-flash-lite-preview-09-2025"
+    "openrouter/openai/gpt-4o-mini"
+)
+
+# Persuadee models (environment simulators)
+PERSUADEE_MODELS=(
+    "openrouter/google/gemini-2.5-flash-lite-preview-09-2025"
+    "openrouter/openai/gpt-4o-mini"
+)
+```
+
+The script will evaluate all persuader × persuadee combinations (6 evaluations in this example).
+
+### Testing Mode
+
+For quick testing with a subset of tasks:
+
+```bash
+# Evaluate only 10 tasks per combination
+export LIMIT=10
+bash run_eval_persuasion.sh
+```
+
+### Evaluation Parameters
+
+Configure evaluation behavior via environment variables:
+
+```bash
+export MAX_CONCURRENT=10   # Concurrent API calls (default: 10)
+export MAX_TURNS=10        # Max conversation turns (default: 10)
+export TEMPERATURE=1.0     # Sampling temperature (default: 1.0)
+export OUTPUT_DIR="./my_eval_results"  # Output directory
+```
+
 ## Files
 
 - `persona_manager.py` - ConvoKit corpus loader and persona manager
@@ -180,6 +324,10 @@ Conversations end when:
 - `generate_with_persuasion.py` - Slime integration entry point
 - `prepare_persuasion_data.py` - Create JSONL task files
 - `run_persuasion_qwen3_4B.sh` - Training script
+- `eval_persuasion.py` - Standalone evaluation script
+- `run_eval_persuasion.sh` - Batch evaluation runner for model combinations
+- `analyze_eval_results.py` - Result analysis and comparison tool
+- `eval_config.yaml` - Evaluation configuration for integrated eval during training
 - `README.md` - This file
 
 ## Key Implementation Details
