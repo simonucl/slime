@@ -28,7 +28,6 @@ export ROOT_DIR=${ROOT_DIR:-"/root"}
 export MODEL_DIR=${MODEL_DIR:-"${ROOT_DIR}"}
 export MODEL_NAME=${MODEL_NAME:-"Qwen3-4B-Instruct-2507"}
 export RAY_TMPDIR=${RAY_TMPDIR:-"${ROOT_DIR}/shared/ray_temp"}
-export DATA_DIR=${DATA_DIR:-"${ROOT_DIR}/examples/persuasion/data"}
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 export SETTINGS_DIR=${SETTINGS_DIR:-"${SCRIPT_DIR}/../../scripts"}
@@ -79,7 +78,7 @@ CKPT_ARGS=(
 
 ROLLOUT_ARGS=(
    # Persuasion uses conversation IDs as prompts, created by prepare_persuasion_data.py
-   --prompt-data ${DATA_DIR}/train_tasks.jsonl
+   --prompt-data ${PERSUASION_CORPUS_PATH}/train_tasks.jsonl
    --input-key index
    --rollout-shuffle
    --num-rollout 300

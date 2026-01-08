@@ -16,7 +16,7 @@ eval:
   datasets:
     # Test set with default persuadee model (gpt-4o-mini)
     - name: test-gpt-4o-mini
-      path: ${oc.env:PERSUASION_DATA_DIR}/test_tasks.jsonl
+      path: ${oc.env:PERSUASION_CORPUS_PATH}/test_tasks.jsonl
       # metadata_overrides can be added here to override persuadee model
       metadata_overrides:
         persuadee_model: "openai/gpt-4o-mini"
@@ -25,7 +25,7 @@ eval:
 
     # Example: Test set with deepseek-v3.2 via OpenRouter
     # - name: test-deepseek-v3.2
-    #   path: ${oc.env:PERSUASION_DATA_DIR}/test_tasks.jsonl
+    #   path: ${oc.env:PERSUASION_CORPUS_PATH}/test_tasks.jsonl
     #   metadata_overrides:
     #     persuadee_model: "openrouter/deepseek/deepseek-v3.2"
     #     persuadee_base_url: "https://openrouter.ai/api/v1"
