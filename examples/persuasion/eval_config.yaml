@@ -1,0 +1,32 @@
+# Evaluation configuration for Persuasion for Good
+# This file configures different evaluation sets with potentially different persuadee simulators
+#
+# Environment variables:
+#   PERSUASION_DATA_DIR: Path to directory containing test_tasks.jsonl
+
+eval:
+  defaults:
+    # Sampling parameters for evaluation
+    temperature: 1.0
+    top_p: 0.95
+    top_k: -1
+    max_response_len: 8192
+    n_samples_per_eval_prompt: 1  # Single sample per task for evaluation
+
+  datasets:
+    # Test set with default persuadee model (gpt-4o-mini)
+    - name: test-gpt-4o-mini
+      path: ${oc.env:PERSUASION_DATA_DIR}/test_tasks.jsonl
+      # metadata_overrides can be added here to override persuadee model
+      metadata_overrides:
+        persuadee_model: "openai/gpt-4o-mini"
+        persuadee_base_url: "https://openrouter.ai/api/v1"
+        persuadee_api_key_var: "OPENROUTER_API_KEY"
+
+    # Example: Test set with deepseek-v3.2 via OpenRouter
+    # - name: test-deepseek-v3.2
+    #   path: ${oc.env:PERSUASION_DATA_DIR}/test_tasks.jsonl
+    #   metadata_overrides:
+    #     persuadee_model: "openrouter/deepseek/deepseek-v3.2"
+    #     persuadee_base_url: "https://openrouter.ai/api/v1"
+    #     persuadee_api_key_var: "OPENROUTER_API_KEY"
