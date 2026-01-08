@@ -10,7 +10,7 @@ import logging
 import os
 from typing import Any, Optional
 
-from slime.rlhf.data import Sample
+from slime.utils.types import Sample
 from persona_manager import PersonaManager, PersuasionTask, PersonaAttributes
 from trainable_agents_persuasion import (
     InteractionResult,
