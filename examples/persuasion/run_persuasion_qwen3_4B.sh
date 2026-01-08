@@ -73,7 +73,7 @@ CKPT_ARGS=(
    --ref-load ${MODEL_DIR}/${MODEL_NAME}_torch_dist/
    --load ${MODEL_DIR}/${MODEL_NAME}_${CHECKPOINT_SUFFIX}/
    --save ${MODEL_DIR}/${MODEL_NAME}_${CHECKPOINT_SUFFIX}/
-   --save-interval 20
+   --save-interval 300
 )
 
 ROLLOUT_ARGS=(
