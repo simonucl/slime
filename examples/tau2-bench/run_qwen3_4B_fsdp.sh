@@ -1,0 +1,190 @@
+#!/bin/bash
+
+# for rerun the task
+pkill -9 sglang
+sleep 3
+ray stop --force
+pkill -9 ray
+sleep 3
+pkill -9 ray
+
+set -ex
+
+# will prevent ray from buffering stdout/stderr
+export PYTHONBUFFERED=16
+
+NVLINK_COUNT=$(nvidia-smi topo -m 2>/dev/null | grep -o 'NV[0-9][0-9]*' | wc -l)
+if [ "$NVLINK_COUNT" -gt 0 ]; then
+    HAS_NVLINK=1
+else
+    HAS_NVLINK=0
+fi
+echo "HAS_NVLINK: $HAS_NVLINK (detected $NVLINK_COUNT NVLink references)"
+
+# =============================================================================
+# Path Configuration
+# =============================================================================
+export ROOT_DIR=${ROOT_DIR:-"/root"}
+export MODEL_DIR=${MODEL_DIR:-"${ROOT_DIR}"}
+export MODEL_NAME=${MODEL_NAME:-"Qwen3-4B-Instruct-2507"}
+export RAY_TMPDIR=${RAY_TMPDIR:-"${ROOT_DIR}/shared/ray_temp"}
+export DATA_DIR=${DATA_DIR:-"${ROOT_DIR}/tau2_bench_data"}
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+
+# =============================================================================
+# τ²-bench Configuration (via environment variables)
+# =============================================================================
+# These can be overridden by setting environment variables before running this script
+
+# Domain and task configuration
+export TAU2_DOMAIN=${TAU2_DOMAIN:-"retail"}           # retail, airline, telecom, mock
+export TAU2_TASK_SPLIT=${TAU2_TASK_SPLIT:-"train"}    # train, test
+export TAU2_AGENT_TYPE=${TAU2_AGENT_TYPE:-"llm"}      # llm, solo, gt
+
+# User simulator configuration
+export TAU2_USER_MODEL=${TAU2_USER_MODEL:-"gpt-4o-mini"}
+export TAU2_USER_BASE_URL=${TAU2_USER_BASE_URL:-"https://api.openai.com/v1"}
+export TAU2_USER_API_KEY_VAR=${TAU2_USER_API_KEY_VAR:-"OPENAI_API_KEY"}
+
+# User model rotation (optional) - uncomment to enable rotation across multiple user simulators
+# Rotates through models in round-robin fashion across n-samples-per-prompt during TRAINING only
+# (Evaluation uses metadata_overrides from eval_config.yaml instead)
+# Example with 3 models (requires OPENROUTER_API_KEY to be set):
+# export TAU2_USER_MODEL_ROTATION="openrouter/deepseek/deepseek-v3.2,openrouter/google/gemini-2.5-flash-lite-preview-09-2025,openrouter/openai/gpt-oss-120b"
+
+# Episode configuration
+export TAU2_MAX_TURNS=${TAU2_MAX_TURNS:-30}     # Max total turns (user + agent messages) per episode
+
+# Checkpoint naming
+CHECKPOINT_SUFFIX=${CHECKPOINT_SUFFIX:-"slime_fsdp"}
+EVAL_CONFIG=${EVAL_CONFIG:-"eval_config.yaml"}
+
+echo "τ²-bench Configuration:"
+echo "  Domain: $TAU2_DOMAIN"
+echo "  Task Split: $TAU2_TASK_SPLIT"
+echo "  User Model: $TAU2_USER_MODEL"
+echo "  Max Turns: $TAU2_MAX_TURNS"
+echo "  Checkpoint Suffix: $CHECKPOINT_SUFFIX"
+echo ""
+
+CKPT_ARGS=(
+   # FSDP uses HuggingFace checkpoint format directly (no torch_dist conversion needed)
+   --hf-checkpoint ${MODEL_DIR}/${MODEL_NAME}/
+   --load ${MODEL_DIR}/${MODEL_NAME}/
+   --ref-load ${MODEL_DIR}/${MODEL_NAME}/
+   --save ${MODEL_DIR}/${MODEL_NAME}_${CHECKPOINT_SUFFIX}/
+   --save-interval 300
+)
+
+ROLLOUT_ARGS=(
+   # τ²-bench uses task indices as prompts, created by prepare_tau2_data.py
+   --prompt-data ${DATA_DIR}/${TAU2_DOMAIN}_train_tasks.jsonl
+   --input-key index
+   --apply-chat-template
+   --rollout-shuffle
+   --balance-data
+   --num-rollout 500
+   --rollout-batch-size 8
+   --n-samples-per-prompt 8
+   --rollout-max-response-len 8192
+   --rollout-temperature 1
+   --global-batch-size 64
+   --dynamic-sampling-filter-path slime.rollout.filter_hub.dynamic_sampling_filters.check_reward_nonzero_std
+)
+
+EVAL_ARGS=(
+   --eval-interval 5
+   --eval-config ${SCRIPT_DIR}/${EVAL_CONFIG}
+   --log-passrate
+)
+
+GRPO_ARGS=(
+   --use-kl-loss
+   --advantage-estimator grpo
+   --kl-loss-coef 0.00
+   --kl-loss-type low_var_kl
+   --kl-coef 0.00
+   --entropy-coef 0.00
+   --eps-clip 0.2
+   --eps-clip-high 0.28
+)
+
+OPTIMIZER_ARGS=(
+   --optimizer adam
+   --lr 1e-6
+   --lr-decay-style constant
+   --weight-decay 0.1
+   --adam-beta1 0.9
+   --adam-beta2 0.98
+)
+
+WANDB_ARGS=(
+   --use-wandb
+   --wandb-project slime-tau2-bench
+   --wandb-group qwen3-4B-fsdp-${CHECKPOINT_SUFFIX}
+   --wandb-key ${WANDB_API_KEY}
+)
+
+SGLANG_ARGS=(
+   --rollout-num-gpus-per-engine 1
+   --sglang-mem-fraction-static 0.75
+   --sglang-decode-log-interval 1000
+   --sglang-chunked-prefill-size 4096
+   --sglang-attention-backend fa3
+)
+
+TRAIN_BACKEND_ARGS=(
+   --train-backend fsdp
+   --update-weight-buffer-size 536870912
+   --gradient-checkpointing
+   --attn-implementation flash_attention_3
+   --train-env-vars '{"PYTORCH_CUDA_ALLOC_CONF":"expandable_segments:True"}'
+)
+
+PERF_ARGS=(
+   --use-dynamic-batch-size
+   --max-tokens-per-gpu 9216
+)
+
+MISC_ARGS=(
+   --actor-num-nodes 1
+   --actor-num-gpus-per-node 8
+   --colocate
+   --use-fault-tolerance
+   # --fsdp-cpu-offload  # Uncomment if you need CPU offloading for memory constraints
+)
+
+CUSTOM_ARGS=(
+   # Use τ²-bench generate function
+   --custom-generate-function-path generate_with_tau2.generate
+)
+
+# launch the master node of ray in container
+export MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
+
+# If you want more or less GPUs, change this parameter
+NUM_GPUS=8
+ray start --head --node-ip-address ${MASTER_ADDR} --num-gpus ${NUM_GPUS} --disable-usage-stats --dashboard-host=0.0.0.0 --dashboard-port=8265 --temp-dir ${RAY_TMPDIR}
+
+RUNTIME_ENV_JSON="{
+  \"env_vars\": {
+    \"PYTHONPATH\": \"${SCRIPT_DIR}\",
+    \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\"
+  }
+}"
+
+ray job submit --address="http://127.0.0.1:8265" \
+   --runtime-env-json="${RUNTIME_ENV_JSON}" \
+   -- python3 train.py \
+   ${CKPT_ARGS[@]} \
+   ${ROLLOUT_ARGS[@]} \
+   ${OPTIMIZER_ARGS[@]} \
+   ${GRPO_ARGS[@]} \
+   ${WANDB_ARGS[@]} \
+   ${SGLANG_ARGS[@]} \
+   ${TRAIN_BACKEND_ARGS[@]} \
+   ${PERF_ARGS[@]} \
+   ${EVAL_ARGS[@]} \
+   ${MISC_ARGS[@]} \
+   ${CUSTOM_ARGS[@]}
