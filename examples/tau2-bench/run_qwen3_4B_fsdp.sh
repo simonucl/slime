@@ -81,9 +81,7 @@ ROLLOUT_ARGS=(
    # τ²-bench uses task indices as prompts, created by prepare_tau2_data.py
    --prompt-data ${DATA_DIR}/${TAU2_DOMAIN}_train_tasks.jsonl
    --input-key index
-   --apply-chat-template
    --rollout-shuffle
-   --balance-data
    --num-rollout 500
    --rollout-batch-size 8
    --n-samples-per-prompt 8
@@ -91,6 +89,7 @@ ROLLOUT_ARGS=(
    --rollout-temperature 1
    --global-batch-size 64
    --dynamic-sampling-filter-path slime.rollout.filter_hub.dynamic_sampling_filters.check_reward_nonzero_std
+   --balance-data
 )
 
 EVAL_ARGS=(
@@ -131,14 +130,12 @@ SGLANG_ARGS=(
    --sglang-mem-fraction-static 0.75
    --sglang-decode-log-interval 1000
    --sglang-chunked-prefill-size 4096
-   --sglang-attention-backend fa3
 )
 
 TRAIN_BACKEND_ARGS=(
    --train-backend fsdp
-   --update-weight-buffer-size 536870912
+   --update-weight-buffer-size 268435456
    --gradient-checkpointing
-   --attn-implementation flash_attention_3
    --train-env-vars '{"PYTORCH_CUDA_ALLOC_CONF":"expandable_segments:True"}'
 )
 
